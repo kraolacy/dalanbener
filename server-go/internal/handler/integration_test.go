@@ -330,3 +330,35 @@ func TestRateLimit(t *testing.T) {
 		t.Fatal("期望触发限流返回 429")
 	}
 }
+
+// TestUnifiedErrorShape 验证统一错误响应：所有失败均返回 {"error": <文案>} + 正确状态码。
+func TestUnifiedErrorShape(t *testing.T) {
+	r := setupTestRouter(t)
+
+	cases := []struct {
+		method, path, token string
+		body                 any
+		wantCode             int
+		wantErr              string
+	}{
+		{"POST", "/api/register", "", map[string]string{"username": "a", "password": "1234"}, 400, "用户名至少 2 个字符"},
+		{"POST", "/api/register", "", map[string]string{"username": "阿强强", "password": "12"}, 400, "密码至少 4 位"},
+		{"POST", "/api/login", "", map[string]string{"username": "nobody", "password": "1234"}, 404, "用户不存在，去注册一个吧"},
+		{"POST", "/api/posts", "faketoken", map[string]string{"title": "x", "body": "y"}, 401, "请先登录"},
+		{"POST", "/api/posts", "", map[string]string{"title": "x", "body": "y"}, 401, "请先登录"},
+		{"GET", "/api/me", "", nil, 401, "请先登录"},
+		{"POST", "/api/posts/nope/like", "", nil, 401, "请先登录"},
+		{"GET", "/api/posts?cursor=!!!notbase64", "", nil, 400, "非法游标"},
+	}
+	for i, c := range cases {
+		w := do(r, c.method, c.path, c.token, c.body)
+		var resp struct {
+			Error string `json:"error"`
+		}
+		_ = json.Unmarshal(w.Body.Bytes(), &resp)
+		if w.Code != c.wantCode || resp.Error != c.wantErr {
+			t.Fatalf("case#%d %s %s => code %d want %d | error %q want %q | body %s",
+				i, c.method, c.path, w.Code, c.wantCode, resp.Error, c.wantErr, w.Body.String())
+		}
+	}
+}

@@ -7,6 +7,7 @@ import (
 
 	"dalanshu/internal/middleware"
 	"dalanshu/internal/model"
+	"dalanshu/internal/resp"
 	"dalanshu/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -24,7 +25,7 @@ func (h *Handlers) signToken(user *model.User) string {
 }
 
 func (h *Handlers) Health(c *gin.Context) {
-	c.JSON(200, gin.H{"ok": true, "name": "dalanshu", "version": 1})
+	c.JSON(resp.Codes.OK, gin.H{"ok": true, "name": "dalanshu", "version": 1})
 }
 
 type authReq struct {
@@ -36,28 +37,28 @@ type authReq struct {
 func (h *Handlers) Register(c *gin.Context) {
 	var r authReq
 	if err := c.ShouldBindJSON(&r); err != nil {
-		c.JSON(400, gin.H{"error": "请求格式错误"})
+		resp.Fail(c, resp.Codes.BadRequest, resp.ErrBind)
 		return
 	}
 	name := strings.TrimSpace(r.Username)
 	if utf8.RuneCountInString(name) < 2 {
-		c.JSON(400, gin.H{"error": "用户名至少 2 个字符"})
+		resp.Fail(c, resp.Codes.BadRequest, resp.ErrUsernameLen)
 		return
 	}
 	if utf8.RuneCountInString(r.Password) < 4 {
-		c.JSON(400, gin.H{"error": "密码至少 4 位"})
+		resp.Fail(c, resp.Codes.BadRequest, resp.ErrPasswordLen)
 		return
 	}
 	u, err := h.user.Register(name, r.Password, r.Avatar)
 	if err != nil {
 		if err == service.ErrDuplicate {
-			c.JSON(409, gin.H{"error": "这个用户名已被注册"})
+			resp.Fail(c, resp.Codes.Conflict, resp.ErrDuplicateUser)
 			return
 		}
-		c.JSON(500, gin.H{"error": "服务器开小差了"})
+		resp.Fail(c, resp.Codes.Internal, resp.ErrServerBusy)
 		return
 	}
-	c.JSON(200, gin.H{
+	resp.OK(c, gin.H{
 		"token": h.signToken(u),
 		"user":  model.UserOut{Name: u.Username, Avatar: u.Avatar, Bio: u.Bio},
 	})
@@ -71,15 +72,15 @@ func (h *Handlers) Login(c *gin.Context) {
 	if err != nil {
 		switch err {
 		case service.ErrNotFound:
-			c.JSON(404, gin.H{"error": "用户不存在，去注册一个吧"})
+			resp.Fail(c, resp.Codes.NotFound, resp.ErrUserNotFound)
 		case service.ErrPassword:
-			c.JSON(401, gin.H{"error": "密码不对"})
+			resp.Fail(c, resp.Codes.Unauthorized, resp.ErrPasswordWrong)
 		default:
-			c.JSON(500, gin.H{"error": "服务器开小差了"})
+			resp.Fail(c, resp.Codes.Internal, resp.ErrServerBusy)
 		}
 		return
 	}
-	c.JSON(200, gin.H{
+	resp.OK(c, gin.H{
 		"token": h.signToken(u),
 		"user":  model.UserOut{Name: u.Username, Avatar: u.Avatar, Bio: u.Bio},
 	})
@@ -88,8 +89,8 @@ func (h *Handlers) Login(c *gin.Context) {
 func (h *Handlers) Me(c *gin.Context) {
 	u := h.user.Get(middleware.UserID(c))
 	if u == nil {
-		c.JSON(401, gin.H{"error": "账号不存在"})
+		resp.Fail(c, resp.Codes.Unauthorized, resp.ErrAccountGone)
 		return
 	}
-	c.JSON(200, model.UserOut{Name: u.Username, Avatar: u.Avatar, Bio: u.Bio})
+	resp.OK(c, model.UserOut{Name: u.Username, Avatar: u.Avatar, Bio: u.Bio})
 }

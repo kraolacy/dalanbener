@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -19,6 +18,7 @@ var (
 	ErrNotFound  = errors.New("资源不存在")
 	ErrDuplicate = errors.New("资源已存在")
 	ErrPassword  = errors.New("密码错误")
+	ErrBadCursor = errors.New("非法游标")
 )
 
 // feedGroup 合并并发 feed 请求，防止缓存击穿（cache stampede）。
@@ -43,15 +43,15 @@ func decodeCursor(cur string) (int64, string, error) {
 	}
 	b, err := base64.RawURLEncoding.DecodeString(cur)
 	if err != nil {
-		return 0, "", fmt.Errorf("非法游标")
+		return 0, "", ErrBadCursor
 	}
 	parts := strings.SplitN(string(b), ",", 2)
 	if len(parts) != 2 {
-		return 0, "", fmt.Errorf("非法游标")
+		return 0, "", ErrBadCursor
 	}
 	ts, err := strconv.ParseInt(parts[0], 10, 64)
 	if err != nil {
-		return 0, "", fmt.Errorf("非法游标")
+		return 0, "", ErrBadCursor
 	}
 	return ts, parts[1], nil
 }

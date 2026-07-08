@@ -124,7 +124,7 @@ func (s *HelpService) Create(ctx context.Context, author, avatar, title, body, t
 		Body:      body,
 		City:      city,
 		Reward:    reward,
-		Ts:        "刚刚",
+		Ts:        model.DefaultTs,
 		CreatedAt: time.Now().UnixMilli(),
 	}
 	if err := s.db.W().WithContext(ctx).Create(&help).Error; err != nil {

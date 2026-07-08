@@ -1,9 +1,10 @@
 package middleware
 
 import (
-	"net/http"
 	"sync"
 	"time"
+
+	"dalanshu/internal/resp"
 
 	"github.com/gin-gonic/gin"
 )
@@ -83,7 +84,7 @@ func NewRateLimiter(rps float64, burst int) gin.HandlerFunc {
 	limiter := newIPLimiter(rps, burst)
 	return func(c *gin.Context) {
 		if !limiter.get(clientIP(c)).allow(time.Now()) {
-			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{"error": "请求太频繁了，歇会儿再来"})
+			resp.Fail(c, resp.Codes.TooManyRequests, resp.ErrRateLimited)
 			return
 		}
 		c.Next()

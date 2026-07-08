@@ -4,6 +4,9 @@ import (
 	"strings"
 
 	"dalanshu/internal/middleware"
+	"dalanshu/internal/model"
+	"dalanshu/internal/resp"
+	"dalanshu/internal/service"
 
 	"github.com/gin-gonic/gin"
 )
@@ -13,14 +16,18 @@ func (h *Handlers) Helps(c *gin.Context) {
 	limit := parseLimit(c.Query("limit"))
 	items, next, err := h.help.List(c.Request.Context(), cursor, limit)
 	if err != nil {
-		c.JSON(500, gin.H{"error": "服务器开小差了"})
+		if err == service.ErrBadCursor {
+			resp.Fail(c, resp.Codes.BadRequest, resp.ErrInvalidCursor)
+			return
+		}
+		resp.Fail(c, resp.Codes.Internal, resp.ErrServerBusy)
 		return
 	}
 	if cursor != "" || c.Query("limit") != "" {
-		c.JSON(200, gin.H{"items": items, "next": next})
+		resp.OKEnvelope(c, items, next)
 		return
 	}
-	c.JSON(200, items)
+	resp.OK(c, items)
 }
 
 type helpReq struct {
@@ -34,7 +41,7 @@ func (h *Handlers) CreateHelp(c *gin.Context) {
 	uid := middleware.UserID(c)
 	user := h.user.Get(uid)
 	if user == nil {
-		c.JSON(401, gin.H{"error": "账号不存在"})
+		resp.Fail(c, resp.Codes.Unauthorized, resp.ErrAccountGone)
 		return
 	}
 	var r helpReq
@@ -42,7 +49,7 @@ func (h *Handlers) CreateHelp(c *gin.Context) {
 	title := strings.TrimSpace(r.Title)
 	body := strings.TrimSpace(r.Body)
 	if title == "" || body == "" {
-		c.JSON(400, gin.H{"error": "标题和说明不能为空"})
+		resp.Fail(c, resp.Codes.BadRequest, resp.ErrHelpReq)
 		return
 	}
 	typ := "need"
@@ -51,16 +58,16 @@ func (h *Handlers) CreateHelp(c *gin.Context) {
 	}
 	city := strings.TrimSpace(r.City)
 	if city == "" {
-		city = "同城"
+		city = model.DefaultCity
 	}
-	reward := "交个朋友"
+	reward := model.DefaultReward
 	if typ == "need" {
-		reward = "当面感谢"
+		reward = model.NeedReward
 	}
 	hp, err := h.help.Create(c.Request.Context(), user.Username, user.Avatar, title, body, typ, city, reward)
 	if err != nil {
-		c.JSON(500, gin.H{"error": "服务器开小差了"})
+		resp.Fail(c, resp.Codes.Internal, resp.ErrServerBusy)
 		return
 	}
-	c.JSON(200, h.help.ShapeSingle(hp))
+	resp.OK(c, h.help.ShapeSingle(hp))
 }

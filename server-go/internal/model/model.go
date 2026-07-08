@@ -2,6 +2,17 @@ package model
 
 import "encoding/json"
 
+// ===== 业务默认值（消除散落的魔法值）=====
+const (
+	DefaultCat    = "rec"      // 帖子默认分类
+	DefaultCity   = "同城"      // 互助默认城市
+	DefaultReward = "交个朋友"  // 提供互助默认报酬
+	NeedReward    = "当面感谢"  // 求助互助默认报酬
+	DefaultTs     = "刚刚"      // 互助默认时间文案
+	DefaultAvatar = "😎"        // 默认头像
+	DefaultBio    = "新来的散帅，请多关照 🌞"
+)
+
 // ===== 数据库模型（GORM）=====
 
 type User struct {

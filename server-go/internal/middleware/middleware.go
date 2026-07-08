@@ -3,6 +3,8 @@ package middleware
 import (
 	"strings"
 
+	"dalanshu/internal/resp"
+
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -43,7 +45,7 @@ func RequireAuth(secret string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		uid, ok := ParseToken(bearer(c.GetHeader("Authorization")), secret)
 		if !ok {
-			c.AbortWithStatusJSON(401, gin.H{"error": "请先登录"})
+			resp.Fail(c, resp.Codes.Unauthorized, "请先登录")
 			return
 		}
 		c.Set(userIDKey, uid)

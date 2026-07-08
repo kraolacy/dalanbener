@@ -35,13 +35,13 @@ func (s *UserService) Register(username, password, avatar string) (*model.User, 
 	}
 	av := avatar
 	if av == "" {
-		av = "😎"
+		av = model.DefaultAvatar
 	}
 	user := model.User{
 		Username:     username,
 		PasswordHash: string(hash),
 		Avatar:       av,
-		Bio:          "新来的散帅，请多关照 🌞",
+		Bio:          model.DefaultBio,
 		CreatedAt:    time.Now().UnixMilli(),
 	}
 	if err := s.db.W().Create(&user).Error; err != nil {

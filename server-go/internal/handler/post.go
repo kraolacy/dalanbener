@@ -5,6 +5,7 @@ import (
 
 	"dalanshu/internal/middleware"
 	"dalanshu/internal/model"
+	"dalanshu/internal/resp"
 	"dalanshu/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -16,15 +17,19 @@ func (h *Handlers) Posts(c *gin.Context) {
 	limit := parseLimit(c.Query("limit"))
 	items, next, err := h.post.ListPosts(c.Request.Context(), uid, cursor, limit)
 	if err != nil {
-		c.JSON(500, gin.H{"error": "服务器开小差了"})
+		if err == service.ErrBadCursor {
+			resp.Fail(c, resp.Codes.BadRequest, resp.ErrInvalidCursor)
+			return
+		}
+		resp.Fail(c, resp.Codes.Internal, resp.ErrServerBusy)
 		return
 	}
 	// 仅当显式分页时才返回 {items,next} 信封，默认仍返回纯数组（兼容前端 api.posts()）。
 	if cursor != "" || c.Query("limit") != "" {
-		c.JSON(200, gin.H{"items": items, "next": next})
+		resp.OKEnvelope(c, items, next)
 		return
 	}
-	c.JSON(200, items)
+	resp.OK(c, items)
 }
 
 type postReq struct {
@@ -40,7 +45,7 @@ func (h *Handlers) CreatePost(c *gin.Context) {
 	uid := middleware.UserID(c)
 	user := h.user.Get(uid)
 	if user == nil {
-		c.JSON(401, gin.H{"error": "账号不存在"})
+		resp.Fail(c, resp.Codes.Unauthorized, resp.ErrAccountGone)
 		return
 	}
 	var r postReq
@@ -48,12 +53,12 @@ func (h *Handlers) CreatePost(c *gin.Context) {
 	title := strings.TrimSpace(r.Title)
 	body := strings.TrimSpace(r.Body)
 	if title == "" || body == "" {
-		c.JSON(400, gin.H{"error": "标题和正文不能为空"})
+		resp.Fail(c, resp.Codes.BadRequest, resp.ErrTitleBodyReq)
 		return
 	}
 	cat := r.Cat
 	if cat == "" {
-		cat = "rec"
+		cat = model.DefaultCat
 	}
 	cover := r.Cover
 	if cover != nil && *cover == "" {
@@ -61,10 +66,10 @@ func (h *Handlers) CreatePost(c *gin.Context) {
 	}
 	p, err := h.post.Create(c.Request.Context(), user.Username, user.Avatar, title, body, cat, r.Tags, r.Festival)
 	if err != nil {
-		c.JSON(500, gin.H{"error": "服务器开小差了"})
+		resp.Fail(c, resp.Codes.Internal, resp.ErrServerBusy)
 		return
 	}
-	c.JSON(200, h.post.ShapeSingle(p, uid))
+	resp.OK(c, h.post.ShapeSingle(p, uid))
 }
 
 type commentReq struct {
@@ -75,26 +80,26 @@ func (h *Handlers) AddComment(c *gin.Context) {
 	uid := middleware.UserID(c)
 	user := h.user.Get(uid)
 	if user == nil {
-		c.JSON(401, gin.H{"error": "账号不存在"})
+		resp.Fail(c, resp.Codes.Unauthorized, resp.ErrAccountGone)
 		return
 	}
 	var r commentReq
 	_ = c.ShouldBindJSON(&r)
 	text := strings.TrimSpace(r.Text)
 	if text == "" {
-		c.JSON(400, gin.H{"error": "评论不能为空"})
+		resp.Fail(c, resp.Codes.BadRequest, resp.ErrCommentEmpty)
 		return
 	}
 	p, err := h.post.AddComment(c.Request.Context(), c.Param("id"), user.Username, user.Avatar, text)
 	if err != nil {
 		if err == service.ErrNotFound {
-			c.JSON(404, gin.H{"error": "帖子不存在"})
+			resp.Fail(c, resp.Codes.NotFound, resp.ErrPostNotFound)
 			return
 		}
-		c.JSON(500, gin.H{"error": "服务器开小差了"})
+		resp.Fail(c, resp.Codes.Internal, resp.ErrServerBusy)
 		return
 	}
-	c.JSON(200, h.post.ShapeSingle(p, uid))
+	resp.OK(c, h.post.ShapeSingle(p, uid))
 }
 
 func (h *Handlers) ToggleLike(c *gin.Context)    { h.togglePost(c, "like") }
@@ -104,7 +109,7 @@ func (h *Handlers) togglePost(c *gin.Context, kind string) {
 	uid := middleware.UserID(c)
 	user := h.user.Get(uid)
 	if user == nil {
-		c.JSON(401, gin.H{"error": "账号不存在"})
+		resp.Fail(c, resp.Codes.Unauthorized, resp.ErrAccountGone)
 		return
 	}
 	var (
@@ -119,11 +124,11 @@ func (h *Handlers) togglePost(c *gin.Context, kind string) {
 	}
 	if err != nil {
 		if err == service.ErrNotFound {
-			c.JSON(404, gin.H{"error": "帖子不存在"})
+			resp.Fail(c, resp.Codes.NotFound, resp.ErrPostNotFound)
 			return
 		}
-		c.JSON(500, gin.H{"error": "服务器开小差了"})
+		resp.Fail(c, resp.Codes.Internal, resp.ErrServerBusy)
 		return
 	}
-	c.JSON(200, h.post.ShapeSingle(p, uid))
+	resp.OK(c, h.post.ShapeSingle(p, uid))
 }
