@@ -5,6 +5,15 @@
 export const CATEGORIES = [
   { key: 'rec',        name: '推荐',     emoji: '🧭', grad: ['#1466ff', '#4d8bff'] },
   { key: 'festival',   name: '散帅节',   emoji: '🌞', grad: ['#ffb200', '#ff7a3d'], sun: true },
+  {
+    key: 'boysday', name: '男生节', emoji: '🎉', grad: ['#1466ff', '#3ec6e0'], festive: true,
+    countdownDate: { m: 6, d: 20 },
+    blurb: '6·20 男生节 —— 男生也需要被宠、被理解、被说一句「你辛苦了」。今天，为自己、也为身边的兄弟庆祝一下。',
+  },
+  {
+    key: 'lol', name: '海克斯大乱斗', emoji: '⚔️', grad: ['#0a1e3f', '#c8aa6e'],
+    blurb: '英雄联盟 · 海克斯/极地大乱斗专区 —— 上分心得、英雄强度榜、五黑招募，召唤师们集合！',
+  },
   { key: 'fitness',    name: '健身撸铁', emoji: '💪', grad: ['#3a7bd5', '#00d2ff'] },
   { key: 'keyboard',   name: '机械键盘', emoji: '⌨️', grad: ['#434a8c', '#6d78d6'] },
   { key: 'fishing',    name: '钓鱼',     emoji: '🎣', grad: ['#0f8a7e', '#4bd0b6'] },
@@ -20,6 +29,15 @@ export const CATEGORIES = [
 ]
 
 export const catByKey = (key) => CATEGORIES.find((c) => c.key === key) || CATEGORIES[0]
+
+// 距离下一个「某月某日」还有多少天（用于专栏节日倒计时）
+export function daysUntil(month, day) {
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  let target = new Date(now.getFullYear(), month - 1, day)
+  if (target < today) target = new Date(now.getFullYear() + 1, month - 1, day)
+  return Math.round((target - today) / 86400000)
+}
 
 // 种子帖子
 export const SEED_POSTS = [
@@ -154,6 +172,61 @@ export const SEED_POSTS = [
     body: '一张桌、一盏灯、一杯咖啡、一排书。\n\n不刷手机的一小时，比熬夜到两点更能回血。给自己一个不被打扰的空间，是成年人最低成本的奢侈。',
     tags: ['生活', '独处', '书房'], likes: 445, collects: 234,
     comments: [],
+  },
+
+  // ===== 6·20 男生节专栏 =====
+  {
+    id: 'b1', cat: 'boysday', tall: true,
+    author: '男生节应援团', avatar: '🎉',
+    title: '6·20 男生节｜今天，对身边的男生说一句「你辛苦了」',
+    body: '男生节快乐！\n\n男生不必永远坚强。今天允许自己松弛一点：睡到自然醒、打一把游戏、约兄弟撸个串。\n也别忘了对身边的爸爸、兄弟、朋友说一句——你辛苦了，你值得被在乎。',
+    tags: ['男生节', '620', '你辛苦了'], likes: 668, collects: 203,
+    comments: [{ author: '沉默老哥', avatar: '🧔', text: '被这句「你辛苦了」整破防了' }],
+  },
+  {
+    id: 'b2', cat: 'boysday',
+    author: '礼物挑选官', avatar: '🎁',
+    title: '男生节送什么？这几样直男真的会开心',
+    body: '机械键盘、球鞋、游戏点卡、剃须刀、一顿烧烤。\n\n别送用不上的摆件，男生要的是「能用、能玩、能吃」。实用才是浪漫。',
+    tags: ['男生节', '送礼攻略', '直男'], likes: 432, collects: 288,
+    comments: [],
+  },
+  {
+    id: 'b3', cat: 'boysday', tall: true,
+    author: '老友记', avatar: '🍻',
+    title: '男生节，约上三五兄弟撸串喝酒吹牛',
+    body: '成年男人的快乐很简单：一桌烧烤、几瓶啤酒、能聊到深夜的老友。\n\n不谈 KPI、不聊房贷，就单纯地做回那个爱笑的少年。今晚谁有空，评论区集合！',
+    tags: ['男生节', '兄弟', '聚会'], likes: 389, collects: 97,
+    comments: [{ author: '常年加班', avatar: '💼', text: '好久没这么放松了，安排！' }],
+  },
+
+  // ===== 英雄联盟 · 海克斯大乱斗专栏 =====
+  {
+    id: 'l1', cat: 'lol', tall: true,
+    author: '中单法王', avatar: '🧙',
+    title: '海克斯大乱斗上分：选对英雄就赢一半',
+    body: '大乱斗吃阵容和消耗。优先级：远程消耗 > 强开团 > 高回复。\n\n新手推荐艾希、维克托、璐璐，站桩输出压好线别浪走位送人头。出装看阵容：对面高爆发先出抗性，顺风直接叠输出滚雪球。',
+    tags: ['英雄联盟', '海克斯大乱斗', '上分'], likes: 721, collects: 355,
+    comments: [
+      { author: '钻石打野', avatar: '🌲', text: '压线意识才是大乱斗的胜负手' },
+      { author: '辅助之光', avatar: '🛡️', text: '璐璐给队友加速真的救了好多次' },
+    ],
+  },
+  {
+    id: 'l2', cat: 'lol',
+    author: '版本雷达', avatar: '📡',
+    title: '本周海克斯大乱斗英雄强度榜（T0 / T1）',
+    body: 'T0：斯维因、婕拉、小炮——消耗拉满，直接劝退对面血线。\nT1：EZ、拉克丝、泽拉斯，手长苟得住。\n\n近战注意：诺手、狼人能开团能 C，但极其怕被风筝，切记别裸冲。',
+    tags: ['英雄联盟', '强度榜', '版本答案'], likes: 534, collects: 412,
+    comments: [],
+  },
+  {
+    id: 'l3', cat: 'lol',
+    author: '五黑缺一', avatar: '🎮',
+    title: '晚八点海克斯大乱斗五黑，缺一个上分搭子',
+    body: '黄金以上、有麦、不喷人，只为快乐游戏。\n\n散帅节这周天天开黑，评论区扣「1」，拉你进队。菜没关系，开心最重要，来的都是兄弟！',
+    tags: ['英雄联盟', '开黑', '五黑招募'], likes: 298, collects: 66,
+    comments: [{ author: '快乐风男', avatar: '😆', text: '1！带我一个' }],
   },
 ]
 

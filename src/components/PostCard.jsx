@@ -6,6 +6,7 @@ export default function PostCard({ post, onOpen }) {
   const cat = catByKey(post.cat)
   const emoji = post.cover || cat.emoji
   const grad = post.festival ? ['#ffb200', '#ff7a3d'] : cat.grad
+  const tag = post.festival ? '🌞 散帅节' : cat.festive ? `${cat.emoji} ${cat.name}` : null
 
   return (
     <article className="card" onClick={() => onOpen(post)}>
@@ -16,7 +17,7 @@ export default function PostCard({ post, onOpen }) {
           minHeight: post.tall ? 150 : 108,
         }}
       >
-        {post.festival && <span className="cover-tag">🌞 散帅节</span>}
+        {tag && <span className="cover-tag">{tag}</span>}
         <span className="emoji">{emoji}</span>
       </div>
       <div className="card-body">

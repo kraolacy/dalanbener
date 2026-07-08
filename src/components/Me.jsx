@@ -3,10 +3,24 @@ import { useStore } from '../store.jsx'
 import Feed from './Feed.jsx'
 
 export default function Me({ onOpen }) {
-  const { posts, me, likes, collects } = useStore()
+  const { posts, me, likes, collects, openAuth, logout } = useStore()
   const [tab, setTab] = useState('mine')
 
-  const minePosts = posts.filter((p) => p.mine)
+  // 未登录：显示登录引导
+  if (me.guest) {
+    return (
+      <div className="empty" style={{ paddingTop: 80 }}>
+        <div className="big">🙂</div>
+        <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>还没登录</p>
+        <p style={{ margin: '8px 0 20px' }}>登录后才能发帖、点赞、评论、找搭子</p>
+        <button className="submit-btn" style={{ maxWidth: 220, margin: '0 auto' }} onClick={openAuth}>
+          登录 / 注册
+        </button>
+      </div>
+    )
+  }
+
+  const minePosts = posts.filter((p) => p.author === me.name)
   const collectedPosts = posts.filter((p) => p.collected)
   const likeCount = Object.keys(likes).length
   const collectCount = Object.keys(collects).length
@@ -16,10 +30,11 @@ export default function Me({ onOpen }) {
       <section className="profile">
         <div className="row">
           <div className="big-avatar">{me.avatar}</div>
-          <div>
+          <div style={{ flex: 1 }}>
             <h2>{me.name}</h2>
             <div className="bio">{me.bio}</div>
           </div>
+          <button className="logout-btn" onClick={logout}>退出</button>
         </div>
         <div className="stats">
           <div><b>{minePosts.length}</b><span>发布</span></div>

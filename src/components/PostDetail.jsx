@@ -3,7 +3,7 @@ import { catByKey } from '../data.js'
 import { useStore } from '../store.jsx'
 
 export default function PostDetail({ post, onClose }) {
-  const { toggleLike, toggleCollect, addComment } = useStore()
+  const { toggleLike, toggleCollect, addComment, me } = useStore()
   const [text, setText] = useState('')
   const cat = catByKey(post.cat)
   const emoji = post.cover || cat.emoji
@@ -60,7 +60,7 @@ export default function PostDetail({ post, onClose }) {
               <div className="comment" key={i}>
                 <span className="avatar">{c.avatar}</span>
                 <div className="c-body">
-                  <b>{c.author}</b>{c.mine && <small> · 我</small>}
+                  <b>{c.author}</b>{!me.guest && c.author === me.name && <small> · 我</small>}
                   <p>{c.text}</p>
                 </div>
               </div>

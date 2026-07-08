@@ -48,14 +48,14 @@ function HelpForm({ onClose }) {
 }
 
 export default function Help() {
-  const { helps } = useStore()
+  const { helps, me, openAuth } = useStore()
   const [open, setOpen] = useState(false)
 
   return (
     <div className="page">
       <div className="section-title" style={{ justifyContent: 'space-between' }}>
         <span>🤝 散帅互助 · 搭子广场</span>
-        <button className="pill-btn" onClick={() => setOpen(true)}>+ 发起</button>
+        <button className="pill-btn" onClick={() => (me.guest ? openAuth() : setOpen(true))}>+ 发起</button>
       </div>
       <p style={{ color: 'var(--ink-2)', fontSize: 13.5, margin: '0 2px 14px' }}>
         搬家、修电脑、找搭子、约球局……兄弟之间搭把手，散帅节更要互相照应。

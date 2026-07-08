@@ -72,6 +72,10 @@ a { color: var(--blue); text-decoration: none; }
 }
 .search input { flex: 1; border: none; background: none; outline: none; color: var(--ink); }
 .search:focus-within { border-color: var(--blue-100); background: #fff; }
+.login-btn { flex: 0 0 auto; background: var(--blue); color: #fff; font-weight: 800; font-size: 14px;
+  padding: 8px 16px; border-radius: 999px; box-shadow: 0 4px 12px rgba(20,90,255,.3); }
+.topbar-avatar { flex: 0 0 auto; width: 36px; height: 36px; border-radius: 50%; background: var(--blue-100);
+  display: grid; place-items: center; font-size: 20px; border: 2px solid var(--blue-100); }
 
 /* ---------- 分类标签 ---------- */
 .tabs {
@@ -88,6 +92,20 @@ a { color: var(--blue); text-decoration: none; }
 }
 .chip.active { background: var(--ink); color: #fff; border-color: var(--ink); }
 .chip.sun.active { background: var(--sun); border-color: var(--sun); color: #3a2a00; }
+
+/* ---------- 专栏介绍条 ---------- */
+.column-intro {
+  margin: 4px 12px 10px; border-radius: 16px; padding: 16px 18px;
+  color: #fff; display: flex; gap: 14px; align-items: center;
+  box-shadow: var(--shadow);
+}
+.column-intro .ci-emoji { font-size: 40px; filter: drop-shadow(0 3px 8px rgba(0,0,0,.25)); flex: 0 0 auto; }
+.column-intro .ci-text h3 { font-size: 17px; font-weight: 900; }
+.column-intro .ci-text p { font-size: 12.5px; opacity: .92; margin-top: 3px; line-height: 1.5; }
+.column-intro .ci-count {
+  display: inline-block; margin-top: 8px; background: rgba(255,255,255,.24);
+  padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; backdrop-filter: blur(2px);
+}
 
 /* ---------- 瀑布流 ---------- */
 .feed {
@@ -177,6 +195,8 @@ a { color: var(--blue); text-decoration: none; }
   display: grid; place-items: center; font-size: 32px; }
 .profile h2 { font-size: 20px; font-weight: 800; }
 .profile .bio { font-size: 13px; opacity: .85; margin-top: 3px; }
+.logout-btn { flex: 0 0 auto; align-self: flex-start; background: rgba(255,255,255,.22); color: #fff;
+  font-size: 12.5px; font-weight: 700; padding: 6px 12px; border-radius: 999px; }
 .stats { display: flex; gap: 24px; margin-top: 18px; }
 .stats div b { font-size: 19px; font-weight: 800; }
 .stats div span { font-size: 12px; opacity: .8; display: block; }

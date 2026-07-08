@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CATEGORIES } from './data.js'
+import { CATEGORIES, catByKey } from './data.js'
 import { useStore } from './store.jsx'
 import Feed from './components/Feed.jsx'
 import Festival from './components/Festival.jsx'
@@ -7,9 +7,11 @@ import Help from './components/Help.jsx'
 import Me from './components/Me.jsx'
 import PostDetail from './components/PostDetail.jsx'
 import CreatePost from './components/CreatePost.jsx'
+import AuthModal from './components/AuthModal.jsx'
+import ColumnIntro from './components/ColumnIntro.jsx'
 
 export default function App() {
-  const { posts, addPost } = useStore()
+  const { posts, addPost, me, openAuth } = useStore()
   const [tab, setTab] = useState('home')
   const [cat, setCat] = useState('rec')
   const [q, setQ] = useState('')
@@ -51,6 +53,11 @@ export default function App() {
               placeholder="搜兴趣、搜搭子、搜散帅…"
             />
           </div>
+          {me.guest ? (
+            <button className="login-btn" onClick={openAuth}>登录</button>
+          ) : (
+            <button className="topbar-avatar" onClick={() => setTab('me')} title={me.name}>{me.avatar}</button>
+          )}
         </div>
       </header>
 
@@ -67,6 +74,7 @@ export default function App() {
               </button>
             ))}
           </nav>
+          <ColumnIntro cat={catByKey(cat)} />
           <Feed posts={homePosts} onOpen={setOpenPost} />
         </>
       )}
@@ -84,7 +92,7 @@ export default function App() {
           <button className={`nav-item ${tab === 'festival' ? 'active' : ''}`} onClick={() => setTab('festival')}>
             <span className="ic">🌞</span>散帅节
           </button>
-          <button className="nav-fab" onClick={() => setCreating(true)} aria-label="发布">＋</button>
+          <button className="nav-fab" onClick={() => (me.guest ? openAuth() : setCreating(true))} aria-label="发布">＋</button>
           <button className={`nav-item ${tab === 'help' ? 'active' : ''}`} onClick={() => setTab('help')}>
             <span className="ic">🤝</span>互助
           </button>
@@ -99,14 +107,18 @@ export default function App() {
         <CreatePost
           onClose={() => setCreating(false)}
           onSubmit={(data) => {
-            addPost(data)
+            const created = addPost(data)
             setCreating(false)
-            setTab('home')
-            setCat('rec')
-            flash('发布成功，散帅节快乐 🌞')
+            if (created) {
+              setTab('home')
+              setCat('rec')
+              flash('发布成功，散帅节快乐 🌞')
+            }
           }}
         />
       )}
+
+      <AuthModal />
 
       {toast && <div className="toast">{toast}</div>}
     </div>
