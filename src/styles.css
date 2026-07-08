@@ -288,6 +288,21 @@ a { color: var(--blue); text-decoration: none; }
 .submit-btn { width: 100%; background: var(--blue); color: #fff; font-weight: 800; font-size: 16px; padding: 13px; border-radius: 14px; box-shadow: 0 8px 20px rgba(20,90,255,.32); }
 .submit-btn:disabled { background: var(--ink-3); box-shadow: none; opacity: .7; }
 
+/* 第三方登录 */
+.third-party { margin-top: 18px; }
+.tp-divider { display: flex; align-items: center; gap: 10px; color: var(--ink-3); font-size: 12px; }
+.tp-divider::before, .tp-divider::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+.tp-icons { display: flex; justify-content: center; gap: 16px; margin-top: 14px; }
+.tp { width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; font-size: 22px;
+  color: #fff; box-shadow: var(--shadow); transition: transform .12s; }
+.tp:hover { transform: translateY(-2px); }
+.tp-wechat { background: #07c160; }
+.tp-qq { background: #12b7f5; }
+.tp-douyin { background: #010101; }
+.tp-phone { background: var(--blue); }
+.tp-notice { margin-top: 12px; font-size: 12px; color: #915c00; background: var(--sun-soft);
+  padding: 8px 12px; border-radius: 10px; line-height: 1.5; }
+
 /* 空状态 */
 .empty { text-align: center; color: var(--ink-3); padding: 60px 20px; }
 .empty .big { font-size: 52px; margin-bottom: 10px; }

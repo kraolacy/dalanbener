@@ -10,8 +10,12 @@ export default function AuthModal() {
   const [password, setPassword] = useState('')
   const [avatar, setAvatar] = useState('😎')
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
 
   if (!authOpen) return null
+
+  const thirdParty = (name) =>
+    setNotice(`${name}登录需接入后端与「${name}」开放平台开发者认证，演示版暂未开通，请先用账号密码 🙏`)
 
   const submit = () => {
     setError('')
@@ -75,7 +79,18 @@ export default function AuthModal() {
               {mode === 'login' ? '去注册' : '去登录'}
             </button>
           </p>
-          <p style={{ textAlign: 'center', marginTop: 6, fontSize: 11.5, color: 'var(--ink-3)' }}>
+          <div className="third-party">
+            <div className="tp-divider"><span>或使用第三方账号登录</span></div>
+            <div className="tp-icons">
+              <button className="tp tp-wechat" onClick={() => thirdParty('微信')} title="微信登录">💬</button>
+              <button className="tp tp-qq" onClick={() => thirdParty('QQ')} title="QQ登录">🐧</button>
+              <button className="tp tp-douyin" onClick={() => thirdParty('抖音')} title="抖音登录">🎵</button>
+              <button className="tp tp-phone" onClick={() => thirdParty('手机号')} title="手机号登录">📱</button>
+            </div>
+            {notice && <p className="tp-notice">🚧 {notice}</p>}
+          </div>
+
+          <p style={{ textAlign: 'center', marginTop: 12, fontSize: 11.5, color: 'var(--ink-3)' }}>
             演示用途，账号仅保存在本机浏览器，请勿使用真实密码
           </p>
         </div>
