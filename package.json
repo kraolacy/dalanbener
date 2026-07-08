@@ -1,0 +1,20 @@
+{
+  "name": "dalanshu",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "大蓝书 —— 对标小红书的男性社群兴趣 / 生活 / 互助分享社区，主题：8·3 国际散帅节",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^6.0.7"
+  }
+}
