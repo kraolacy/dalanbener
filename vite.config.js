@@ -1,8 +1,11 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { viteSingleFile } from 'vite-plugin-singlefile'
 
-// 纯前端单页应用；base 相对路径，方便部署到 GitHub Pages 子路径
+// 纯前端单页应用。
+// viteSingleFile：build 时把 JS/CSS 全部内联进一个 index.html，
+// 这样 dist/index.html 可以直接双击(file://)打开，无需服务器、可离线。
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), viteSingleFile()],
   base: './',
 })
