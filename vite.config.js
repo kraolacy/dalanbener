@@ -8,4 +8,10 @@ import { viteSingleFile } from 'vite-plugin-singlefile'
 export default defineConfig({
   plugins: [react(), viteSingleFile()],
   base: './',
+  // 本地联调：前端 :5173 的 /api 代理到 Go 后端 :8080
+  server: {
+    proxy: {
+      '/api': 'http://localhost:8080',
+    },
+  },
 })

@@ -10,6 +10,9 @@ server/data/
 server/public/
 server/*.log
 
+# docker 持久化卷（mysql / redis）
+/data/
+
 # local env
 *.local
 .env
@@ -32,3 +35,9 @@ Thumbs.db
 *.ntvs*
 *.njsproj
 *.sln
+
+# codebuddy（技能 / 记忆 / 本地配置，不入库）
+.codebuddy/
+
+# 内部设计文档（不入库）
+docs/
