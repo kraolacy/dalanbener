@@ -31,7 +31,7 @@ export default function AuthModal() {
       <div className="sheet" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 420 }}>
         <div className="sheet-head">
           <button className="icon-btn" onClick={closeAuth}>✕</button>
-          <h3>{mode === 'login' ? '登录大蓝书' : '注册大蓝书'}</h3>
+          <h3>{mode === 'login' ? '登录大蓝本儿' : '注册大蓝本儿'}</h3>
           <span style={{ width: 32 }} />
         </div>
 

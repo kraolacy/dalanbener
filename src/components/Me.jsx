@@ -45,7 +45,7 @@ export default function Me({ onOpen }) {
 
       <div className="badge-row">
         <span className="badge">🌞 散帅节首批用户</span>
-        <span className="badge">💙 大蓝书 · 蓝V</span>
+        <span className="badge">💙 大蓝本儿 · 蓝V</span>
         <span className="badge">🤝 热心搭子</span>
       </div>
 

@@ -42,8 +42,10 @@ export default function App() {
         <div className="topbar-inner">
           <div className="brand">
             <span className="logo">蓝</span>
-            大蓝书
-            <small>散散帅 · 交交友</small>
+            <span className="brand-text">
+              <b>大蓝本儿</b>
+              <small>Sunshine-note</small>
+            </span>
           </div>
           <div className="search">
             🔍

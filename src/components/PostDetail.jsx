@@ -47,7 +47,7 @@ export default function PostDetail({ post, onClose }) {
             <div>
               <b>{post.author}</b>
               <br />
-              <small>{post.festival ? '散帅节参与者 · 阳光男孩' : '大蓝书用户'}</small>
+              <small>{post.festival ? '散帅节参与者 · 阳光男孩' : '大蓝本儿用户'}</small>
             </div>
           </div>
 

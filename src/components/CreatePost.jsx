@@ -118,7 +118,7 @@ export default function CreatePost({ onClose, onSubmit }) {
 
         <div className="submit-bar">
           <button className="submit-btn" onClick={submit} disabled={!canPost}>
-            发布到大蓝书
+            发布到大蓝本儿
           </button>
         </div>
       </div>
