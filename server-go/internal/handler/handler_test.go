@@ -76,7 +76,7 @@ func TestShapePostsBatch(t *testing.T) {
 	set.W().Create(&model.Comment{PostID: "a", Author: "z", Text: "c1", CreatedAt: 1})
 	set.W().Create(&model.Comment{PostID: "a", Author: "z", Text: "c2", CreatedAt: 2})
 
-	out, err := svc.ListPosts(testCtx(), 0)
+	out, _, err := svc.ListPosts(testCtx(), 0, "", 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,11 +110,11 @@ func TestOverlayLikesCopies(t *testing.T) {
 	set.W().Create(&model.Like{UserID: 1, PostID: "a"})
 	svc := service.NewPostService(set, nil)
 
-	asUser1, err := svc.ListPosts(testCtx(), 1)
+	asUser1, _, err := svc.ListPosts(testCtx(), 1, "", 0)
 	if err != nil {
 		t.Fatal(err)
 	}
-	asAnon, err := svc.ListPosts(testCtx(), 0)
+	asAnon, _, err := svc.ListPosts(testCtx(), 0, "", 0)
 	if err != nil {
 		t.Fatal(err)
 	}

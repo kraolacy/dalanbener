@@ -11,9 +11,17 @@ import (
 )
 
 func (h *Handlers) Posts(c *gin.Context) {
-	items, err := h.post.ListPosts(c.Request.Context(), middleware.UserID(c))
+	uid := middleware.UserID(c)
+	cursor := c.Query("cursor")
+	limit := parseLimit(c.Query("limit"))
+	items, next, err := h.post.ListPosts(c.Request.Context(), uid, cursor, limit)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "服务器开小差了"})
+		return
+	}
+	// 仅当显式分页时才返回 {items,next} 信封，默认仍返回纯数组（兼容前端 api.posts()）。
+	if cursor != "" || c.Query("limit") != "" {
+		c.JSON(200, gin.H{"items": items, "next": next})
 		return
 	}
 	c.JSON(200, items)

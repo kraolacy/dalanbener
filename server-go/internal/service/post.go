@@ -24,10 +24,40 @@ func NewPostService(d *db.DBSet, c *cache.Cache) *PostService {
 	return &PostService{db: d, cache: newFeedCache(c)}
 }
 
-// ListPosts 帖子流（C1 全量兼容模式）。详见 C2 游标分页扩展。
-func (s *PostService) ListPosts(ctx context.Context, uid int64) ([]model.PostOut, error) {
+// ListPosts 帖子流。
+//   - cursor=="" 且 limit<=0：全量兼容模式（缓存 + singleflight），返回纯数组，next 为空。
+//   - 否则：keyset 游标分页，返回 (items, next, err)；next 为空表示末页。
+func (s *PostService) ListPosts(ctx context.Context, uid int64, cursor string, limit int) ([]model.PostOut, string, error) {
+	if cursor == "" && limit <= 0 {
+		return s.listAll(ctx, uid)
+	}
+	if limit <= 0 {
+		limit = defaultPageLimit
+	}
+	if limit > maxPageLimit {
+		limit = maxPageLimit
+	}
+	ca, cid, err := decodeCursor(cursor)
+	if err != nil {
+		return nil, "", err
+	}
+	raw, hasNext, err := s.pagePosts(ctx, ca, cid, limit)
+	if err != nil {
+		return nil, "", err
+	}
+	out := s.overlayLikes(s.shapePosts(raw), uid)
+	next := ""
+	if hasNext && len(raw) > 0 {
+		last := raw[len(raw)-1]
+		next = encodeCursor(last.CreatedAt, last.ID)
+	}
+	return out, next, nil
+}
+
+// listAll 全量兼容模式：缓存 + singleflight 合并并发，返回带 per-user 状态的数组。
+func (s *PostService) listAll(ctx context.Context, uid int64) ([]model.PostOut, string, error) {
 	if base, ok := s.cache.getPosts(ctx); ok {
-		return s.overlayLikes(base, uid), nil
+		return s.overlayLikes(base, uid), "", nil
 	}
 	if s.cache.c != nil {
 		v, err, _ := feedGroup.Do("posts", func() (any, error) {
@@ -40,14 +70,31 @@ func (s *PostService) ListPosts(ctx context.Context, uid int64) ([]model.PostOut
 		if err == nil {
 			base := v.([]model.PostOut)
 			s.cache.setPosts(ctx, base)
-			return s.overlayLikes(base, uid), nil
+			return s.overlayLikes(base, uid), "", nil
 		}
 	}
 	raw, err := s.allPosts(ctx)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
-	return s.overlayLikes(s.shapePosts(raw), uid), nil
+	return s.overlayLikes(s.shapePosts(raw), uid), "", nil
+}
+
+// pagePosts keyset 分页：基于 (created_at,id) 游标向后取一页（多取 1 条判断 hasNext）。
+func (s *PostService) pagePosts(ctx context.Context, ca int64, cid string, limit int) ([]model.Post, bool, error) {
+	q := s.db.R().WithContext(ctx).Model(&model.Post{})
+	if ca > 0 {
+		q = q.Where("(created_at < ?) OR (created_at = ? AND id < ?)", ca, ca, cid)
+	}
+	var posts []model.Post
+	if err := q.Order("created_at DESC, id DESC").Limit(limit + 1).Find(&posts).Error; err != nil {
+		return nil, false, err
+	}
+	hasNext := len(posts) > limit
+	if hasNext {
+		posts = posts[:limit]
+	}
+	return posts, hasNext, nil
 }
 
 func (s *PostService) allPosts(ctx context.Context) ([]model.Post, error) {

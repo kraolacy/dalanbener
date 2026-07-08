@@ -24,6 +24,12 @@ var (
 // feedGroup 合并并发 feed 请求，防止缓存击穿（cache stampede）。
 var feedGroup singleflight.Group
 
+// 游标分页的默认页大小与上限（避免单页过大导致深翻页性能塌陷）。
+const (
+	defaultPageLimit = 20
+	maxPageLimit     = 50
+)
+
 // encodeCursor 将 (createdAt,id) 编码为 base64 游标（URL 安全）。
 func encodeCursor(createdAt int64, id string) string {
 	raw := strconv.FormatInt(createdAt, 10) + "," + id

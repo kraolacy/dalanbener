@@ -208,3 +208,91 @@ func TestAnonPostsLikedFalse(t *testing.T) {
 		}
 	}
 }
+
+// TestPostsCursorPagination 验证游标分页：默认返回纯数组，带 limit 返回 {items,next} 且可翻完。
+func TestPostsCursorPagination(t *testing.T) {
+	r := setupTestRouter(t)
+
+	// 默认（无参数）仍返回纯数组，兼容前端 api.posts()。
+	w := do(r, "GET", "/api/posts", "", nil)
+	if w.Code != 200 {
+		t.Fatalf("posts code %d", w.Code)
+	}
+	var all []model.PostOut
+	_ = json.Unmarshal(w.Body.Bytes(), &all)
+	if len(all) != 21 {
+		t.Fatalf("默认 posts 数=%d want 21", len(all))
+	}
+
+	// 分页：limit=5，逐页翻完，累计应等于 21。
+	total := 0
+	cursor := ""
+	pages := 0
+	for {
+		path := "/api/posts?limit=5"
+		if cursor != "" {
+			path += "&cursor=" + cursor
+		}
+		w := do(r, "GET", path, "", nil)
+		if w.Code != 200 {
+			t.Fatalf("分页 posts code %d", w.Code)
+		}
+		var page struct {
+			Items []model.PostOut `json:"items"`
+			Next  string          `json:"next"`
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &page); err != nil {
+			t.Fatalf("分页响应解析失败: %v", err)
+		}
+		if len(page.Items) == 0 {
+			t.Fatal("分页返回空页")
+		}
+		if len(page.Items) > 5 {
+			t.Fatalf("单页不应超 limit: %d", len(page.Items))
+		}
+		total += len(page.Items)
+		cursor = page.Next
+		pages++
+		if cursor == "" {
+			break
+		}
+		if pages > 100 {
+			t.Fatal("分页未终止，可能游标失效")
+		}
+	}
+	if total != 21 {
+		t.Fatalf("分页累计 posts=%d want 21", total)
+	}
+}
+
+// TestHelpsCursorPagination 验证互助流游标分页。
+func TestHelpsCursorPagination(t *testing.T) {
+	r := setupTestRouter(t)
+	total := 0
+	cursor := ""
+	for {
+		path := "/api/helps?limit=2"
+		if cursor != "" {
+			path += "&cursor=" + cursor
+		}
+		w := do(r, "GET", path, "", nil)
+		if w.Code != 200 {
+			t.Fatalf("分页 helps code %d", w.Code)
+		}
+		var page struct {
+			Items []model.HelpOut `json:"items"`
+			Next  string          `json:"next"`
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &page); err != nil {
+			t.Fatalf("分页响应解析失败: %v", err)
+		}
+		total += len(page.Items)
+		cursor = page.Next
+		if cursor == "" {
+			break
+		}
+	}
+	if total != 5 {
+		t.Fatalf("分页累计 helps=%d want 5", total)
+	}
+}

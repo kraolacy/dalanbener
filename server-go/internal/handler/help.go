@@ -9,9 +9,15 @@ import (
 )
 
 func (h *Handlers) Helps(c *gin.Context) {
-	items, err := h.help.List(c.Request.Context())
+	cursor := c.Query("cursor")
+	limit := parseLimit(c.Query("limit"))
+	items, next, err := h.help.List(c.Request.Context(), cursor, limit)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "服务器开小差了"})
+		return
+	}
+	if cursor != "" || c.Query("limit") != "" {
+		c.JSON(200, gin.H{"items": items, "next": next})
 		return
 	}
 	c.JSON(200, items)
