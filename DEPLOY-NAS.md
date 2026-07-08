@@ -12,7 +12,7 @@
 ### 1. 把项目放到 NAS
 两种方式二选一：
 - **File Station 上传**：新建文件夹（如 `/docker/dalanshu`），把本仓库内容传进去（至少要有：`Dockerfile`、`docker-compose.yml`、`package.json`、`package-lock.json`、`index.html`、`vite.config.js`、`src/`、`public/`、`server/`）。
-- **命令行 git**（若开了 SSH）：`cd /volume1/docker && git clone https://github.com/kraolacy/dalanshu.git`
+- **命令行 git**（若开了 SSH）：`cd /volume1/docker && git clone https://github.com/kraolacy/dalanbener.git`
 
 ### 2. 改密钥（重要）
 编辑 `docker-compose.yml`，把 `JWT_SECRET` 换成一长串随机字符（登录令牌签名用，泄露=别人能伪造登录）：
