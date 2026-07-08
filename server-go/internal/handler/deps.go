@@ -36,6 +36,10 @@ func NewRouter(d Deps) *gin.Engine {
 
 	r := gin.New()
 	r.Use(gin.Recovery())
+	// 全局限流（可选）：RATE_LIMIT>0 时按客户端 IP 做 token bucket 限速。
+	if d.RateLimit > 0 {
+		r.Use(middleware.NewRateLimiter(d.RateLimit, burstFor(d.RateLimit)))
+	}
 
 	api := r.Group("/api")
 	{
@@ -52,6 +56,15 @@ func NewRouter(d Deps) *gin.Engine {
 		api.POST("/helps", middleware.RequireAuth(d.Secret), h.CreateHelp)
 	}
 	return r
+}
+
+// burstFor 由 rps 推导突发容量，至少 1。
+func burstFor(rps float64) int {
+	b := int(rps * 2)
+	if b < 1 {
+		b = 1
+	}
+	return b
 }
 
 // parseLimit 解析分页大小：空或非法→0（表示不启用分页，走全量兼容模式）。

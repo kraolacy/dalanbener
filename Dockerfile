@@ -7,11 +7,12 @@ COPY . .
 RUN npm run build
 
 # ---- 2) 构建 Go 后端（gin + gorm + mysql + redis）----
-FROM golang:1.23 AS gobuild
+# 注意：依赖树要求 Go >= 1.25（部分 golang.org/x 与 modernc.org 传递依赖所致），故构建镜像用 1.25。
+FROM golang:1.25 AS gobuild
 WORKDIR /src
 COPY server-go/ ./
 RUN go mod download
-RUN CGO_ENABLED=0 GOOS=linux go build -o /dalanshu .
+RUN CGO_ENABLED=0 GOOS=linux go build -o /dalanshu ./cmd/server
 
 # ---- 3) 运行 ----
 FROM alpine:3.20

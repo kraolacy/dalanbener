@@ -296,3 +296,37 @@ func TestHelpsCursorPagination(t *testing.T) {
 		t.Fatalf("分页累计 helps=%d want 5", total)
 	}
 }
+
+// TestRateLimit 验证限流中间件：超出速率后返回 429。
+func TestRateLimit(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	g, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sqlDB, _ := g.DB()
+	sqlDB.SetMaxOpenConns(1)
+	if err := g.AutoMigrate(
+		&model.User{}, &model.Post{}, &model.Comment{},
+		&model.Like{}, &model.Collect{}, &model.Help{},
+	); err != nil {
+		t.Fatal(err)
+	}
+	set := &db.DBSet{Write: g, Read: g}
+	// 极低速率 + burst=1：首个请求放行，后续立即被限流。
+	r := NewRouter(Deps{DB: set, Cache: nil, Secret: "secret", RateLimit: 0.0001})
+
+	if w := do(r, "GET", "/api/health", "", nil); w.Code != 200 {
+		t.Fatalf("首个请求应放行，got %d", w.Code)
+	}
+	got429 := false
+	for i := 0; i < 5; i++ {
+		if w := do(r, "GET", "/api/health", "", nil); w.Code == 429 {
+			got429 = true
+			break
+		}
+	}
+	if !got429 {
+		t.Fatal("期望触发限流返回 429")
+	}
+}
