@@ -11,7 +11,7 @@ import AuthModal from './components/AuthModal.jsx'
 import ColumnIntro from './components/ColumnIntro.jsx'
 
 export default function App() {
-  const { posts, addPost, me, openAuth } = useStore()
+  const { posts, addPost, me, openAuth, ready } = useStore()
   const [tab, setTab] = useState('home')
   const [cat, setCat] = useState('rec')
   const [q, setQ] = useState('')
@@ -22,6 +22,17 @@ export default function App() {
   const flash = (msg) => {
     setToast(msg)
     setTimeout(() => setToast(''), 1800)
+  }
+
+  if (!ready) {
+    return (
+      <div className="app-shell">
+        <div className="empty" style={{ paddingTop: 140 }}>
+          <div className="big">🌀</div>
+          正在连接大蓝本儿…
+        </div>
+      </div>
+    )
   }
 
   const query = q.trim().toLowerCase()
@@ -108,8 +119,8 @@ export default function App() {
       {creating && (
         <CreatePost
           onClose={() => setCreating(false)}
-          onSubmit={(data) => {
-            const created = addPost(data)
+          onSubmit={async (data) => {
+            const created = await addPost(data)
             setCreating(false)
             if (created) {
               setTab('home')

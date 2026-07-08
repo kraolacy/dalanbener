@@ -17,11 +17,11 @@ export default function AuthModal() {
   const thirdParty = (name) =>
     setNotice(`${name}登录需接入后端与「${name}」开放平台开发者认证，演示版暂未开通，请先用账号密码 🙏`)
 
-  const submit = () => {
+  const submit = async () => {
     setError('')
-    const res = mode === 'login'
+    const res = await (mode === 'login'
       ? login({ username, password })
-      : register({ username, password, avatar })
+      : register({ username, password, avatar }))
     if (!res.ok) setError(res.error)
     else { setUsername(''); setPassword('') }
   }

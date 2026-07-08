@@ -1,0 +1,14 @@
+services:
+  dalanshu:
+    build: .
+    image: dalanshu:latest
+    container_name: dalanshu
+    ports:
+      - "8088:3000"          # 群晖上用 http://<NAS-IP>:8088 访问；改左边数字可换端口
+    volumes:
+      - ./server/data:/app/data   # SQLite 数据库持久化到宿主机，删容器也不丢
+    environment:
+      # ⚠️ 上线前把它改成一长串随机字符串（登录令牌签名密钥）
+      - JWT_SECRET=please-change-me-to-a-long-random-string
+      - DB_PATH=/app/data/dalanshu.db
+    restart: unless-stopped

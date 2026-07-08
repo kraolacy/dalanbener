@@ -5,6 +5,11 @@ node_modules/
 dist/
 dist-ssr/
 
+# 后端：数据库、日志、以及本地测试时复制进来的前端产物
+server/data/
+server/public/
+server/*.log
+
 # local env
 *.local
 .env

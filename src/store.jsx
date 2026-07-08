@@ -1,178 +1,207 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { SEED_POSTS, SEED_HELP } from './data.js'
+import { api, setToken as apiSetToken } from './api.js'
 
 // ===== 本地存储封装 =====
 const LS = {
   get(key, fallback) {
-    try {
-      const v = localStorage.getItem(key)
-      return v ? JSON.parse(v) : fallback
-    } catch {
-      return fallback
-    }
+    try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback } catch { return fallback }
   },
-  set(key, val) {
-    try { localStorage.setItem(key, JSON.stringify(val)) } catch { /* 隐私模式等，忽略 */ }
-  },
+  set(key, val) { try { localStorage.setItem(key, JSON.stringify(val)) } catch { /* 隐私模式忽略 */ } },
+  del(key) { try { localStorage.removeItem(key) } catch { /* ignore */ } },
 }
-
 const K = {
-  userPosts: 'dls_userPosts',
-  likes: 'dls_likes',
-  collects: 'dls_collects',
-  comments: 'dls_comments',
-  userHelp: 'dls_userHelp',
-  accounts: 'dls_accounts',       // { [用户名]: { password, avatar, bio } }
-  currentUser: 'dls_currentUser', // 当前登录用户名，或 null
+  userPosts: 'dls_userPosts', likes: 'dls_likes', collects: 'dls_collects',
+  comments: 'dls_comments', userHelp: 'dls_userHelp', accounts: 'dls_accounts',
+  currentUser: 'dls_currentUser', token: 'dls_token',
 }
-
 const GUEST = { name: '游客', avatar: '🙂', bio: '登录后开启你的散帅之旅', guest: true }
 
 const StoreCtx = createContext(null)
 
 export function StoreProvider({ children }) {
+  // —— 运行模式 ——
+  const [backend, setBackend] = useState(false)   // 后端是否可用
+  const [ready, setReady] = useState(false)       // 首屏数据是否就绪
+  // —— 后端模式状态 ——
+  const [apiPosts, setApiPosts] = useState([])
+  const [apiHelps, setApiHelps] = useState([])
+  const [apiMe, setApiMe] = useState(null)
+  const [token, setTok] = useState(() => LS.get(K.token, null))
+  // —— localStorage 模式状态 ——
   const [userPosts, setUserPosts] = useState(() => LS.get(K.userPosts, []))
-  const [likes, setLikes] = useState(() => LS.get(K.likes, {}))
-  const [collects, setCollects] = useState(() => LS.get(K.collects, {}))
-  const [comments, setComments] = useState(() => LS.get(K.comments, {}))
+  const [lLikes, setLLikes] = useState(() => LS.get(K.likes, {}))
+  const [lCollects, setLCollects] = useState(() => LS.get(K.collects, {}))
+  const [lComments, setLComments] = useState(() => LS.get(K.comments, {}))
   const [userHelp, setUserHelp] = useState(() => LS.get(K.userHelp, []))
   const [accounts, setAccounts] = useState(() => LS.get(K.accounts, {}))
   const [currentUser, setCurrentUser] = useState(() => LS.get(K.currentUser, null))
-  const [authOpen, setAuthOpen] = useState(false) // 登录/注册弹窗
+  const [authOpen, setAuthOpen] = useState(false)
 
+  // localStorage 持久化
   useEffect(() => LS.set(K.userPosts, userPosts), [userPosts])
-  useEffect(() => LS.set(K.likes, likes), [likes])
-  useEffect(() => LS.set(K.collects, collects), [collects])
-  useEffect(() => LS.set(K.comments, comments), [comments])
+  useEffect(() => LS.set(K.likes, lLikes), [lLikes])
+  useEffect(() => LS.set(K.collects, lCollects), [lCollects])
+  useEffect(() => LS.set(K.comments, lComments), [lComments])
   useEffect(() => LS.set(K.userHelp, userHelp), [userHelp])
   useEffect(() => LS.set(K.accounts, accounts), [accounts])
   useEffect(() => LS.set(K.currentUser, currentUser), [currentUser])
 
-  // 当前用户：已登录取账号信息，否则游客
+  // —— 启动：探测后端 ——
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      const online = await api.health()
+      if (!alive) return
+      if (online) {
+        setBackend(true)
+        if (token) {
+          apiSetToken(token)
+          try { setApiMe(await api.me()) } catch { apiSetToken(null); setTok(null); LS.del(K.token) }
+        }
+        try {
+          const [p, h] = await Promise.all([api.posts(), api.helps()])
+          if (alive) { setApiPosts(p); setApiHelps(h) }
+        } catch { /* 忽略，留空 */ }
+      }
+      if (alive) setReady(true)
+    })()
+    return () => { alive = false }
+  }, []) // eslint-disable-line
+
+  const refresh = async () => {
+    const [p, h] = await Promise.all([api.posts(), api.helps()])
+    setApiPosts(p); setApiHelps(h)
+  }
+  const persistToken = (t) => { setTok(t); apiSetToken(t); if (t) LS.set(K.token, t); else LS.del(K.token) }
+
+  // —— 当前用户 ——
   const me = useMemo(() => {
+    if (backend) return apiMe ? { name: apiMe.name, avatar: apiMe.avatar || '😎', bio: apiMe.bio || '', guest: false } : GUEST
     if (currentUser && accounts[currentUser]) {
       const a = accounts[currentUser]
       return { name: currentUser, avatar: a.avatar || '😎', bio: a.bio || '', guest: false }
     }
     return GUEST
-  }, [currentUser, accounts])
-
+  }, [backend, apiMe, currentUser, accounts])
   const isLoggedIn = !me.guest
-  const openAuth = () => setAuthOpen(true)
-  const closeAuth = () => setAuthOpen(false)
-  // 需要登录的操作：未登录则弹出登录窗并返回 false
-  const gate = () => {
-    if (isLoggedIn) return true
-    openAuth()
-    return false
-  }
 
-  // 合并帖子并附带运行时状态
-  const posts = useMemo(() => {
-    const all = [...userPosts, ...SEED_POSTS]
-    return all.map((p) => {
-      const extra = comments[p.id] || []
-      const liked = !!likes[p.id]
-      const collected = !!collects[p.id]
+  // —— 帖子/互助（按模式取源）——
+  const lsPosts = useMemo(() => {
+    return [...userPosts, ...SEED_POSTS].map((p) => {
+      const extra = lComments[p.id] || []
+      const liked = !!lLikes[p.id]
+      const collected = !!lCollects[p.id]
       return {
-        ...p,
-        liked,
-        collected,
+        ...p, liked, collected,
         likeCount: (p.likes || 0) + (liked ? 1 : 0),
         collectCount: (p.collects || 0) + (collected ? 1 : 0),
         comments: [...(p.comments || []), ...extra],
       }
     })
-  }, [userPosts, likes, collects, comments])
+  }, [userPosts, lLikes, lCollects, lComments])
 
-  const helps = useMemo(() => [...userHelp, ...SEED_HELP], [userHelp])
+  const posts = backend ? apiPosts : lsPosts
+  const helps = backend ? apiHelps : [...userHelp, ...SEED_HELP]
 
-  const toggle = (setter) => (id) => {
-    if (!gate()) return
-    setter((m) => {
-      const next = { ...m }
-      if (next[id]) delete next[id]
-      else next[id] = true
-      return next
-    })
-  }
+  // Me 页统计用的 likes/collects 对象（两模式都提供兼容结构）
+  const likes = backend
+    ? Object.fromEntries(apiPosts.filter((p) => p.liked).map((p) => [p.id, true]))
+    : lLikes
+  const collects = backend
+    ? Object.fromEntries(apiPosts.filter((p) => p.collected).map((p) => [p.id, true]))
+    : lCollects
+
+  const openAuth = () => setAuthOpen(true)
+  const closeAuth = () => setAuthOpen(false)
+  const gate = () => { if (isLoggedIn) return true; openAuth(); return false }
+
+  // localStorage 模式的点赞/收藏切换
+  const lsToggle = (setter) => (id) => setter((m) => {
+    const next = { ...m }; if (next[id]) delete next[id]; else next[id] = true; return next
+  })
 
   const actions = {
     // ---- 账号 ----
-    register({ username, password, avatar }) {
+    async register({ username, password, avatar }) {
+      if (backend) {
+        try {
+          const { token: t, user } = await api.register({ username, password, avatar })
+          persistToken(t); setApiMe(user); setAuthOpen(false); await refresh(); return { ok: true }
+        } catch (e) { return { ok: false, error: e.message } }
+      }
       const name = (username || '').trim()
       if (name.length < 2) return { ok: false, error: '用户名至少 2 个字符' }
       if ((password || '').length < 4) return { ok: false, error: '密码至少 4 位' }
       if (accounts[name]) return { ok: false, error: '这个用户名已被注册' }
       setAccounts((m) => ({ ...m, [name]: { password, avatar: avatar || '😎', bio: '新来的散帅，请多关照 🌞' } }))
-      setCurrentUser(name)
-      setAuthOpen(false)
-      return { ok: true }
+      setCurrentUser(name); setAuthOpen(false); return { ok: true }
     },
-    login({ username, password }) {
+    async login({ username, password }) {
+      if (backend) {
+        try {
+          const { token: t, user } = await api.login({ username, password })
+          persistToken(t); setApiMe(user); setAuthOpen(false); await refresh(); return { ok: true }
+        } catch (e) { return { ok: false, error: e.message } }
+      }
       const name = (username || '').trim()
       const a = accounts[name]
       if (!a) return { ok: false, error: '用户不存在，去注册一个吧' }
       if (a.password !== password) return { ok: false, error: '密码不对' }
-      setCurrentUser(name)
-      setAuthOpen(false)
-      return { ok: true }
+      setCurrentUser(name); setAuthOpen(false); return { ok: true }
     },
-    logout() { setCurrentUser(null) },
-    openAuth,
-    closeAuth,
+    logout() {
+      if (backend) { persistToken(null); setApiMe(null); refresh() }
+      else setCurrentUser(null)
+    },
+    openAuth, closeAuth,
 
-    // ---- 内容（均需登录）----
-    toggleLike: toggle(setLikes),
-    toggleCollect: toggle(setCollects),
-    addComment(postId, text) {
+    // ---- 互动（均需登录）----
+    async toggleLike(id) {
       if (!gate()) return
-      const t = text.trim()
-      if (!t) return
-      setComments((m) => ({
-        ...m,
-        [postId]: [...(m[postId] || []), { author: me.name, avatar: me.avatar, text: t }],
-      }))
+      if (backend) { try { const p = await api.toggleLike(id); setApiPosts((list) => list.map((x) => x.id === id ? p : x)) } catch { /* ignore */ } }
+      else lsToggle(setLLikes)(id)
     },
-    addPost({ title, body, cat, cover, tags, festival }) {
+    async toggleCollect(id) {
+      if (!gate()) return
+      if (backend) { try { const p = await api.toggleCollect(id); setApiPosts((list) => list.map((x) => x.id === id ? p : x)) } catch { /* ignore */ } }
+      else lsToggle(setLCollects)(id)
+    },
+    async addComment(postId, text) {
+      if (!gate()) return
+      const t = (text || '').trim(); if (!t) return
+      if (backend) { try { const p = await api.addComment(postId, t); setApiPosts((list) => list.map((x) => x.id === postId ? p : x)) } catch { /* ignore */ } }
+      else setLComments((m) => ({ ...m, [postId]: [...(m[postId] || []), { author: me.name, avatar: me.avatar, text: t }] }))
+    },
+    async addPost({ title, body, cat, cover, tags, festival }) {
       if (!gate()) return null
+      if (backend) {
+        try { const p = await api.createPost({ title, body, cat, cover, tags, festival }); setApiPosts((list) => [p, ...list]); return p }
+        catch { return null }
+      }
       const post = {
-        id: 'u' + Date.now(),
-        cat,
-        author: me.name,
-        avatar: me.avatar,
-        title: title.trim(),
-        body: body.trim(),
-        cover,
-        tags: tags || [],
-        likes: 0,
-        collects: 0,
-        comments: [],
-        festival: !!festival,
-        tall: (body || '').length > 60,
+        id: 'u' + Date.now(), cat, author: me.name, avatar: me.avatar,
+        title: title.trim(), body: body.trim(), cover, tags: tags || [],
+        likes: 0, collects: 0, comments: [], festival: !!festival, tall: (body || '').length > 60,
       }
-      setUserPosts((list) => [post, ...list])
-      return post
+      setUserPosts((list) => [post, ...list]); return post
     },
-    addHelp({ type, title, body, city }) {
+    async addHelp({ type, title, body, city }) {
       if (!gate()) return null
-      const item = {
-        id: 'uh' + Date.now(),
-        type,
-        author: me.name,
-        avatar: me.avatar,
-        title: title.trim(),
-        body: body.trim(),
-        city: city.trim() || '同城',
-        reward: type === 'need' ? '当面感谢' : '交个朋友',
-        ts: '刚刚',
+      if (backend) {
+        try { const h = await api.createHelp({ type, title, body, city }); setApiHelps((list) => [h, ...list]); return h }
+        catch { return null }
       }
-      setUserHelp((list) => [item, ...list])
-      return item
+      const item = {
+        id: 'uh' + Date.now(), type, author: me.name, avatar: me.avatar,
+        title: title.trim(), body: body.trim(), city: (city || '').trim() || '同城',
+        reward: type === 'need' ? '当面感谢' : '交个朋友', ts: '刚刚',
+      }
+      setUserHelp((list) => [item, ...list]); return item
     },
   }
 
-  const value = { posts, helps, likes, collects, me, isLoggedIn, authOpen, ...actions }
+  const value = { posts, helps, likes, collects, me, isLoggedIn, authOpen, ready, backend, ...actions }
   return <StoreCtx.Provider value={value}>{children}</StoreCtx.Provider>
 }
 

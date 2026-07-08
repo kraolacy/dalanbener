@@ -1,0 +1,19 @@
+{
+  "name": "dalanshu-server",
+  "private": true,
+  "version": "1.0.0",
+  "description": "大蓝本儿 Sunshine-note 后端（Express + 内置 node:sqlite），可自托管于群晖 NAS",
+  "main": "server.js",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=22.5"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2"
+  }
+}

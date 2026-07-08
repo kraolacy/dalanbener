@@ -38,7 +38,7 @@ function HelpForm({ onClose }) {
           <input type="text" maxLength={12} value={city} placeholder="例如：杭州" onChange={(e) => setCity(e.target.value)} />
         </div>
         <div className="submit-bar">
-          <button className="submit-btn" disabled={!canPost} onClick={() => { addHelp({ type, title, body, city }); onClose() }}>
+          <button className="submit-btn" disabled={!canPost} onClick={async () => { const r = await addHelp({ type, title, body, city }); if (r) onClose() }}>
             发布互助
           </button>
         </div>
