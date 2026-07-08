@@ -26,6 +26,7 @@ db.exec(`
     title TEXT NOT NULL,
     body TEXT NOT NULL,
     cover TEXT,
+    image TEXT,
     tags TEXT DEFAULT '[]',
     festival INTEGER DEFAULT 0,
     tall INTEGER DEFAULT 0,
@@ -48,18 +49,22 @@ db.exec(`
     user_id INTEGER NOT NULL, post_id TEXT NOT NULL, PRIMARY KEY (user_id, post_id)
   );
   CREATE TABLE IF NOT EXISTS helps (
-    id TEXT PRIMARY KEY,
-    type TEXT NOT NULL,
-    author TEXT NOT NULL,
-    avatar TEXT DEFAULT '😎',
-    title TEXT NOT NULL,
-    body TEXT NOT NULL,
-    city TEXT DEFAULT '同城',
-    reward TEXT DEFAULT '交个朋友',
-    ts TEXT DEFAULT '刚刚',
-    created_at INTEGER NOT NULL
+    id TEXT PRIMARY KEY, type TEXT NOT NULL, author TEXT NOT NULL, avatar TEXT DEFAULT '😎',
+    title TEXT NOT NULL, body TEXT NOT NULL, city TEXT DEFAULT '同城', reward TEXT DEFAULT '交个朋友',
+    ts TEXT DEFAULT '刚刚', created_at INTEGER NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS follows (
+    follower_id INTEGER NOT NULL, target TEXT NOT NULL, PRIMARY KEY (follower_id, target)
+  );
+  CREATE TABLE IF NOT EXISTS messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    from_name TEXT NOT NULL, to_name TEXT NOT NULL, text TEXT NOT NULL,
+    read INTEGER DEFAULT 0, created_at INTEGER NOT NULL
   );
 `)
+
+// 老库平滑升级：补 posts.image 列（新库已含，忽略"重复列"错误）
+try { db.exec('ALTER TABLE posts ADD COLUMN image TEXT') } catch { /* 列已存在 */ }
 
 // 首次启动写入种子数据
 function seedIfEmpty() {

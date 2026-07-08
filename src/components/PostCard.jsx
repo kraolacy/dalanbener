@@ -12,13 +12,14 @@ export default function PostCard({ post, onOpen }) {
     <article className="card" onClick={() => onOpen(post)}>
       <div
         className="cover"
-        style={{
-          background: `linear-gradient(135deg, ${grad[0]}, ${grad[1]})`,
-          minHeight: post.tall ? 150 : 108,
-        }}
+        style={post.image
+          ? { padding: 0, minHeight: 0 }
+          : { background: `linear-gradient(135deg, ${grad[0]}, ${grad[1]})`, minHeight: post.tall ? 150 : 108 }}
       >
         {tag && <span className="cover-tag">{tag}</span>}
-        <span className="emoji">{emoji}</span>
+        {post.image
+          ? <img className="cover-img" src={post.image} alt="" loading="lazy" />
+          : <span className="emoji">{emoji}</span>}
       </div>
       <div className="card-body">
         <div className="card-title">{post.title}</div>

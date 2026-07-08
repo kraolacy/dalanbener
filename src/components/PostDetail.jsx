@@ -2,12 +2,14 @@ import { useState } from 'react'
 import { catByKey } from '../data.js'
 import { useStore } from '../store.jsx'
 
-export default function PostDetail({ post, onClose }) {
-  const { toggleLike, toggleCollect, addComment, me } = useStore()
+export default function PostDetail({ post, onClose, onMessage }) {
+  const { toggleLike, toggleCollect, addComment, toggleFollow, me } = useStore()
   const [text, setText] = useState('')
   const cat = catByKey(post.cat)
   const emoji = post.cover || cat.emoji
   const grad = post.festival ? ['#ffb200', '#ff7a3d'] : cat.grad
+  const isMine = !me.guest && post.author === me.name
+  const following = (me.following || []).includes(post.author)
 
   const send = () => {
     if (!text.trim()) return
@@ -23,12 +25,15 @@ export default function PostDetail({ post, onClose }) {
           <button className="icon-btn" onClick={onClose}>✕</button>
         </div>
 
-        <div
-          className="detail-cover"
-          style={{ background: `linear-gradient(135deg, ${grad[0]}, ${grad[1]})` }}
-        >
-          <span className="emoji">{emoji}</span>
-        </div>
+        {post.image ? (
+          <div className="detail-cover" style={{ padding: 0 }}>
+            <img className="detail-img" src={post.image} alt="" />
+          </div>
+        ) : (
+          <div className="detail-cover" style={{ background: `linear-gradient(135deg, ${grad[0]}, ${grad[1]})` }}>
+            <span className="emoji">{emoji}</span>
+          </div>
+        )}
 
         <div className="detail-body">
           <h2>{post.title}</h2>
@@ -44,11 +49,19 @@ export default function PostDetail({ post, onClose }) {
 
           <div className="detail-author">
             <span className="avatar">{post.avatar}</span>
-            <div>
+            <div style={{ flex: 1, minWidth: 0 }}>
               <b>{post.author}</b>
               <br />
               <small>{post.festival ? '散帅节参与者 · 阳光男孩' : '大蓝本儿用户'}</small>
             </div>
+            {!isMine && (
+              <div style={{ display: 'flex', gap: 8, flex: '0 0 auto' }}>
+                <button className={`follow-btn ${following ? 'on' : ''}`} onClick={() => toggleFollow(post.author)}>
+                  {following ? '已关注' : '+ 关注'}
+                </button>
+                <button className="msg-btn" onClick={() => onMessage && onMessage(post.author)}>私信</button>
+              </div>
+            )}
           </div>
 
           <div className="comments">

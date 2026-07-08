@@ -9,10 +9,23 @@ export default function CreatePost({ onClose, onSubmit }) {
   const [body, setBody] = useState('')
   const [cat, setCat] = useState('fitness')
   const [cover, setCover] = useState('💪')
+  const [image, setImage] = useState(null) // 上传的图片（base64 dataURL）
+  const [imgErr, setImgErr] = useState('')
   const [tagStr, setTagStr] = useState('')
   const [festival, setFestival] = useState(false)
 
   const canPost = title.trim().length > 0 && body.trim().length > 0
+
+  const onFile = (e) => {
+    const f = e.target.files?.[0]
+    e.target.value = ''
+    if (!f) return
+    if (f.size > 3 * 1024 * 1024) { setImgErr('图片请小于 3MB'); return }
+    setImgErr('')
+    const r = new FileReader()
+    r.onload = () => setImage(r.result)
+    r.readAsDataURL(f)
+  }
 
   const submit = () => {
     if (!canPost) return
@@ -21,7 +34,7 @@ export default function CreatePost({ onClose, onSubmit }) {
       .map((s) => s.trim())
       .filter(Boolean)
       .slice(0, 5)
-    onSubmit({ title, body, cat: festival ? 'festival' : cat, cover, tags, festival: festival || cat === 'festival' })
+    onSubmit({ title, body, cat: festival ? 'festival' : cat, cover, image, tags, festival: festival || cat === 'festival' })
   }
 
   return (
@@ -41,14 +54,26 @@ export default function CreatePost({ onClose, onSubmit }) {
         </div>
 
         <div className="form-field">
-          <label>封面</label>
-          <div className="emoji-picker">
-            {EMOJIS.map((e) => (
-              <button key={e} className={`emoji-opt ${cover === e ? 'sel' : ''}`} onClick={() => setCover(e)}>
-                {e}
-              </button>
-            ))}
-          </div>
+          <label>封面（选 emoji 或上传图片）</label>
+          {image ? (
+            <div className="img-preview">
+              <img src={image} alt="预览" />
+              <button onClick={() => setImage(null)}>✕ 移除图片</button>
+            </div>
+          ) : (
+            <div className="emoji-picker">
+              <label className="emoji-opt upload-opt" title="上传图片">
+                📷
+                <input type="file" accept="image/*" onChange={onFile} style={{ display: 'none' }} />
+              </label>
+              {EMOJIS.map((e) => (
+                <button key={e} className={`emoji-opt ${cover === e ? 'sel' : ''}`} onClick={() => setCover(e)}>
+                  {e}
+                </button>
+              ))}
+            </div>
+          )}
+          {imgErr && <p style={{ color: 'var(--pink)', fontSize: 12, marginTop: 8 }}>⚠️ {imgErr}</p>}
         </div>
 
         <div className="form-field">

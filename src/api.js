@@ -33,4 +33,9 @@ export const api = {
   addComment: (id, text) => req(`/api/posts/${id}/comments`, { method: 'POST', body: { text } }),
   toggleLike: (id) => req(`/api/posts/${id}/like`, { method: 'POST' }),
   toggleCollect: (id) => req(`/api/posts/${id}/collect`, { method: 'POST' }),
+  upload: (dataUrl) => req('/api/upload', { method: 'POST', body: { dataUrl } }),
+  follow: (name) => req(`/api/follow/${encodeURIComponent(name)}`, { method: 'POST' }),
+  conversations: () => req('/api/messages'),
+  thread: (name) => req(`/api/messages/${encodeURIComponent(name)}`),
+  sendMessage: (to, text) => req('/api/messages', { method: 'POST', body: { to, text } }),
 }

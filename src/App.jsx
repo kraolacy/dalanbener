@@ -9,6 +9,7 @@ import PostDetail from './components/PostDetail.jsx'
 import CreatePost from './components/CreatePost.jsx'
 import AuthModal from './components/AuthModal.jsx'
 import ColumnIntro from './components/ColumnIntro.jsx'
+import MessagesSheet from './components/MessagesSheet.jsx'
 
 export default function App() {
   const { posts, addPost, me, openAuth, ready } = useStore()
@@ -17,11 +18,17 @@ export default function App() {
   const [q, setQ] = useState('')
   const [openPost, setOpenPost] = useState(null)
   const [creating, setCreating] = useState(false)
+  const [messagesOpen, setMessagesOpen] = useState(false)
+  const [messagesTo, setMessagesTo] = useState(null)
   const [toast, setToast] = useState('')
 
   const flash = (msg) => {
     setToast(msg)
     setTimeout(() => setToast(''), 1800)
+  }
+  const openMessages = (to = null) => {
+    if (me.guest) return openAuth()
+    setMessagesTo(to); setMessagesOpen(true)
   }
 
   if (!ready) {
@@ -37,7 +44,9 @@ export default function App() {
 
   const query = q.trim().toLowerCase()
   const homePosts = posts.filter((p) => {
-    const catOk = cat === 'rec' || p.cat === cat || (cat === 'festival' && p.festival)
+    const catOk = cat === 'following'
+      ? (me.following || []).includes(p.author)
+      : cat === 'rec' || p.cat === cat || (cat === 'festival' && p.festival)
     if (!catOk) return false
     if (!query) return true
     const hay = (p.title + p.body + p.author + (p.tags || []).join(' ')).toLowerCase()
@@ -66,6 +75,9 @@ export default function App() {
               placeholder="搜兴趣、搜搭子、搜散帅…"
             />
           </div>
+          <button className="icon-btn topbar-msg" onClick={() => openMessages()} aria-label="私信">
+            ✉️{!me.guest && me.unread > 0 && <span className="msg-badge">{me.unread > 99 ? '99+' : me.unread}</span>}
+          </button>
           {me.guest ? (
             <button className="login-btn" onClick={openAuth}>登录</button>
           ) : (
@@ -77,6 +89,7 @@ export default function App() {
       {tab === 'home' && (
         <>
           <nav className="tabs">
+            <button className={`chip ${cat === 'following' ? 'active' : ''}`} onClick={() => setCat('following')}>❤️ 关注</button>
             {CATEGORIES.map((c) => (
               <button
                 key={c.key}
@@ -115,7 +128,13 @@ export default function App() {
         </div>
       </nav>
 
-      {livePost && <PostDetail post={livePost} onClose={() => setOpenPost(null)} />}
+      {livePost && (
+        <PostDetail
+          post={livePost}
+          onClose={() => setOpenPost(null)}
+          onMessage={(name) => { setOpenPost(null); openMessages(name) }}
+        />
+      )}
       {creating && (
         <CreatePost
           onClose={() => setCreating(false)}
@@ -130,6 +149,8 @@ export default function App() {
           }}
         />
       )}
+
+      {messagesOpen && <MessagesSheet onClose={() => setMessagesOpen(false)} initialTo={messagesTo} />}
 
       <AuthModal />
 

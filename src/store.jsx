@@ -13,9 +13,9 @@ const LS = {
 const K = {
   userPosts: 'dls_userPosts', likes: 'dls_likes', collects: 'dls_collects',
   comments: 'dls_comments', userHelp: 'dls_userHelp', accounts: 'dls_accounts',
-  currentUser: 'dls_currentUser', token: 'dls_token',
+  currentUser: 'dls_currentUser', token: 'dls_token', following: 'dls_following',
 }
-const GUEST = { name: '游客', avatar: '🙂', bio: '登录后开启你的散帅之旅', guest: true }
+const GUEST = { name: '游客', avatar: '🙂', bio: '登录后开启你的散帅之旅', guest: true, following: [], followers: 0, unread: 0 }
 
 const StoreCtx = createContext(null)
 
@@ -36,6 +36,7 @@ export function StoreProvider({ children }) {
   const [userHelp, setUserHelp] = useState(() => LS.get(K.userHelp, []))
   const [accounts, setAccounts] = useState(() => LS.get(K.accounts, {}))
   const [currentUser, setCurrentUser] = useState(() => LS.get(K.currentUser, null))
+  const [lFollowing, setLFollowing] = useState(() => LS.get(K.following, {}))
   const [authOpen, setAuthOpen] = useState(false)
 
   // localStorage 持久化
@@ -46,6 +47,7 @@ export function StoreProvider({ children }) {
   useEffect(() => LS.set(K.userHelp, userHelp), [userHelp])
   useEffect(() => LS.set(K.accounts, accounts), [accounts])
   useEffect(() => LS.set(K.currentUser, currentUser), [currentUser])
+  useEffect(() => LS.set(K.following, lFollowing), [lFollowing])
 
   // —— 启动：探测后端 ——
   useEffect(() => {
@@ -73,17 +75,22 @@ export function StoreProvider({ children }) {
     const [p, h] = await Promise.all([api.posts(), api.helps()])
     setApiPosts(p); setApiHelps(h)
   }
+  const refreshMe = async () => { if (backend && token) { try { setApiMe(await api.me()) } catch { /* ignore */ } } }
   const persistToken = (t) => { setTok(t); apiSetToken(t); if (t) LS.set(K.token, t); else LS.del(K.token) }
 
   // —— 当前用户 ——
   const me = useMemo(() => {
-    if (backend) return apiMe ? { name: apiMe.name, avatar: apiMe.avatar || '😎', bio: apiMe.bio || '', guest: false } : GUEST
+    if (backend) return apiMe
+      ? { name: apiMe.name, avatar: apiMe.avatar || '😎', bio: apiMe.bio || '', guest: false,
+          following: apiMe.following || [], followers: apiMe.followers || 0, unread: apiMe.unread || 0 }
+      : GUEST
     if (currentUser && accounts[currentUser]) {
       const a = accounts[currentUser]
-      return { name: currentUser, avatar: a.avatar || '😎', bio: a.bio || '', guest: false }
+      return { name: currentUser, avatar: a.avatar || '😎', bio: a.bio || '', guest: false,
+        following: Object.keys(lFollowing), followers: 0, unread: 0 }
     }
     return GUEST
-  }, [backend, apiMe, currentUser, accounts])
+  }, [backend, apiMe, currentUser, accounts, lFollowing])
   const isLoggedIn = !me.guest
 
   // —— 帖子/互助（按模式取源）——
@@ -173,18 +180,37 @@ export function StoreProvider({ children }) {
       if (backend) { try { const p = await api.addComment(postId, t); setApiPosts((list) => list.map((x) => x.id === postId ? p : x)) } catch { /* ignore */ } }
       else setLComments((m) => ({ ...m, [postId]: [...(m[postId] || []), { author: me.name, avatar: me.avatar, text: t }] }))
     },
-    async addPost({ title, body, cat, cover, tags, festival }) {
+    async addPost({ title, body, cat, cover, image, tags, festival }) {
       if (!gate()) return null
       if (backend) {
-        try { const p = await api.createPost({ title, body, cat, cover, tags, festival }); setApiPosts((list) => [p, ...list]); return p }
-        catch { return null }
+        try {
+          let img = image || null
+          if (img && img.startsWith('data:')) { const u = await api.upload(img); img = u.url } // 先上传图片拿到 URL
+          const p = await api.createPost({ title, body, cat, cover, image: img, tags, festival })
+          setApiPosts((list) => [p, ...list]); return p
+        } catch { return null }
       }
       const post = {
         id: 'u' + Date.now(), cat, author: me.name, avatar: me.avatar,
-        title: title.trim(), body: body.trim(), cover, tags: tags || [],
+        title: title.trim(), body: body.trim(), cover, image: image || null, tags: tags || [],
         likes: 0, collects: 0, comments: [], festival: !!festival, tall: (body || '').length > 60,
       }
       setUserPosts((list) => [post, ...list]); return post
+    },
+    // ---- 关注 / 私信 ----
+    async toggleFollow(name) {
+      if (!gate()) return
+      if (name === me.name) return
+      if (backend) { try { setApiMe(await api.follow(name)) } catch { /* ignore */ } }
+      else setLFollowing((m) => { const n = { ...m }; if (n[name]) delete n[name]; else n[name] = true; return n })
+    },
+    refreshMe,
+    async getConversations() { if (!backend) return []; try { return await api.conversations() } catch { return [] } },
+    async getThread(name) { if (!backend) return null; try { const t = await api.thread(name); refreshMe(); return t } catch { return null } },
+    async sendMessage(to, text) {
+      if (!isLoggedIn) { openAuth(); return { ok: false } }
+      if (!backend) return { ok: false, error: '私信是联网版（NAS/服务器）功能，本地演示版暂不支持' }
+      try { await api.sendMessage(to, text); return { ok: true } } catch (e) { return { ok: false, error: e.message } }
     },
     async addHelp({ type, title, body, city }) {
       if (!gate()) return null

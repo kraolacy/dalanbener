@@ -38,6 +38,8 @@ export default function Me({ onOpen }) {
         </div>
         <div className="stats">
           <div><b>{minePosts.length}</b><span>发布</span></div>
+          <div><b>{(me.following || []).length}</b><span>关注</span></div>
+          <div><b>{me.followers || 0}</b><span>粉丝</span></div>
           <div><b>{likeCount}</b><span>点赞</span></div>
           <div><b>{collectCount}</b><span>收藏</span></div>
         </div>
