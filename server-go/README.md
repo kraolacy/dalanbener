@@ -17,6 +17,13 @@
 | POST | `/api/posts/:id/collect` | 是 | 收藏切换 |
 | GET | `/api/helps` | 否 | 互助流（支持 `?cursor=&limit=` 游标分页） |
 | POST | `/api/helps` | 是 | 发互助 |
+| POST | `/api/upload` | 是 | 图片上传（base64 dataURL），返回 `{url}`；仅 png/jpg/gif/webp，≤3MB |
+| POST | `/api/follow/:name` | 是 | 关注/取关切换（toggle），返回最新用户对象 |
+| GET | `/api/messages` | 是 | 私信会话列表（按对端聚合，含未读计数） |
+| GET | `/api/messages/:name` | 是 | 与某人的私信线程（打开即标记已读） |
+| POST | `/api/messages` | 是 | 发私信，返回 `{ok:true}` |
+
+> `register` / `login` / `me` 返回的用户对象已含 `following`（关注列表）/`followers`（粉丝数）/`unread`（未读私信数）；`posts` 返回含 `image` 字段。「关注信息流」由前端基于 `me.following` 对 `/api/posts` 全量过滤，无需独立后端接口。
 
 ## 目录结构（分层 + 读写分离底座）
 
@@ -30,15 +37,17 @@ server-go/
 │   ├── model/              # GORM 模型 + 对外 DTO
 │   ├── middleware/         # JWT 鉴权 + 限流
 │   ├── service/            # 业务层：聚合、游标分页、toggle（参考小红书 Feed 分层）
-│   │   ├── post.go         # 帖子域：feed 聚合、游标分页、点赞/收藏
+│   │   ├── post.go         # 帖子域：feed 聚合、游标分页、点赞/收藏、image 透传
 │   │   ├── help.go         # 互助域
 │   │   ├── user.go         # 用户域：注册/登录/查询
+│   │   ├── social.go       # 社交域：关注 toggle、用户完整信息、私信会话/线程/发送
 │   │   └── feed.go         # 游标编解码、缓存编排、统一错误
 │   ├── handler/            # HTTP 适配层（薄）：绑定参数→调 service→写响应
 │   │   ├── deps.go         # 依赖装配 + NewRouter（供 main 与测试复用）
-│   │   ├── auth.go         # 鉴权相关接口
+│   │   ├── auth.go         # 鉴权相关接口（register/login/me 含关注信息）
 │   │   ├── post.go         # 帖子相关接口
-│   │   └── help.go         # 互助相关接口
+│   │   ├── help.go         # 互助相关接口
+│   │   └── social.go       # 社交相关接口（上传/关注/私信）
 │   └── seed/               # 首次启动种子（go:embed seed.json）
 ├── go.mod
 └── go.sum
@@ -91,7 +100,7 @@ docker compose up --build      # 含 mysql + redis + go；前端由 Go 同源托
 # 访问 http://<IP>:8088
 ```
 
-数据持久化在宿主机 `./data/{mysql,redis}`，删容器不丢。上线前务必修改 `JWT_SECRET`。
+数据持久化在宿主机 `./data/{mysql,redis,uploads}`，删容器不丢（上传图片在 `./data/uploads`）。上线前务必修改 `JWT_SECRET`。
 
 ## 配置（环境变量）
 
@@ -106,6 +115,7 @@ docker compose up --build      # 含 mysql + redis + go；前端由 Go 同源托
 | `REDIS_ADDR` | `127.0.0.1:6379` | Redis 地址（留空则禁用缓存、直查数据库） |
 | `REDIS_PASS` | 空 | Redis 密码 |
 | `RATE_LIMIT` | `0` | 全局每 IP 每秒请求上限（token bucket）；`0` 关闭限流 |
+| `UPLOAD_DIR` | `./data/uploads` | 图片上传落盘目录（经 `/uploads` 静态托管）；生产建议挂载持久卷 |
 | `STATIC_DIR` | 空 | 前端构建产物目录；设置后由本服务同源托管 SPA |
 | `GIN_MODE` | `release` | gin 模式 |
 | `MIGRATE_FROM` / `MIGRATE_TO` | `sqlite` / `mysql` | `migrate` 子命令的源/目标驱动 |

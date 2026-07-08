@@ -114,6 +114,8 @@ func Migrate(d *DBSet) error {
 		&model.Like{},
 		&model.Collect{},
 		&model.Help{},
+		&model.Follow{},
+		&model.Message{},
 	)
 }
 
@@ -122,6 +124,7 @@ func MigrateData(src, dst *DBSet) error {
 	models := []any{
 		&model.User{}, &model.Post{}, &model.Comment{},
 		&model.Like{}, &model.Collect{}, &model.Help{},
+		&model.Follow{}, &model.Message{},
 	}
 	for _, m := range models {
 		if err := copyTable(src.W(), dst.W(), m); err != nil {

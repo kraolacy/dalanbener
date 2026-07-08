@@ -25,6 +25,7 @@ func newTestSet(t *testing.T) *db.DBSet {
 	if err := g.AutoMigrate(
 		&model.User{}, &model.Post{}, &model.Comment{},
 		&model.Like{}, &model.Collect{}, &model.Help{},
+		&model.Follow{}, &model.Message{},
 	); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}

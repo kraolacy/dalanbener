@@ -17,14 +17,17 @@ type Deps struct {
 	Cache     *cache.Cache
 	Secret    string
 	RateLimit float64
+	UploadDir string
 }
 
 // Handlers 聚合所有 HTTP 处理逻辑（薄适配层：绑定参数→调 service→写响应）。
 type Handlers struct {
-	post   *service.PostService
-	help   *service.HelpService
-	user   *service.UserService
-	secret string
+	post     *service.PostService
+	help     *service.HelpService
+	user     *service.UserService
+	social   *service.SocialService
+	secret   string
+	uploadDir string
 }
 
 // NewRouter 装配路由与中间件（供 main 与测试复用）。
@@ -32,7 +35,8 @@ func NewRouter(d Deps) *gin.Engine {
 	postSvc := service.NewPostService(d.DB, d.Cache)
 	helpSvc := service.NewHelpService(d.DB, d.Cache)
 	userSvc := service.NewUserService(d.DB)
-	h := &Handlers{post: postSvc, help: helpSvc, user: userSvc, secret: d.Secret}
+	socialSvc := service.NewSocialService(d.DB)
+	h := &Handlers{post: postSvc, help: helpSvc, user: userSvc, social: socialSvc, secret: d.Secret, uploadDir: d.UploadDir}
 
 	r := gin.New()
 	r.Use(gin.Recovery())
@@ -54,7 +58,15 @@ func NewRouter(d Deps) *gin.Engine {
 		api.POST("/posts/:id/collect", middleware.RequireAuth(d.Secret), h.ToggleCollect)
 		api.GET("/helps", h.Helps)
 		api.POST("/helps", middleware.RequireAuth(d.Secret), h.CreateHelp)
+		// 社交：关注 / 私信 / 图片上传
+		api.POST("/upload", middleware.RequireAuth(d.Secret), h.Upload)
+		api.POST("/follow/:name", middleware.RequireAuth(d.Secret), h.Follow)
+		api.GET("/messages", middleware.RequireAuth(d.Secret), h.Conversations)
+		api.GET("/messages/:name", middleware.RequireAuth(d.Secret), h.Thread)
+		api.POST("/messages", middleware.RequireAuth(d.Secret), h.SendMessage)
 	}
+	// 上传图片静态托管（与落盘目录一致）。
+	r.Static("/uploads", d.UploadDir)
 	return r
 }
 

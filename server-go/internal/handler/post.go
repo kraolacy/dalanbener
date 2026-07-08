@@ -37,6 +37,7 @@ type postReq struct {
 	Body     string   `json:"body"`
 	Cat      string   `json:"cat"`
 	Cover    *string  `json:"cover"`
+	Image    *string  `json:"image"`
 	Tags     []string `json:"tags"`
 	Festival bool     `json:"festival"`
 }
@@ -64,7 +65,7 @@ func (h *Handlers) CreatePost(c *gin.Context) {
 	if cover != nil && *cover == "" {
 		cover = nil
 	}
-	p, err := h.post.Create(c.Request.Context(), user.Username, user.Avatar, title, body, cat, r.Tags, r.Festival)
+	p, err := h.post.Create(c.Request.Context(), user.Username, user.Avatar, title, body, cat, r.Image, r.Tags, r.Festival)
 	if err != nil {
 		resp.Fail(c, resp.Codes.Internal, resp.ErrServerBusy)
 		return

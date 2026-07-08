@@ -118,15 +118,16 @@ func (s *PostService) shapePosts(posts []model.Post) []model.PostOut {
 	out := make([]model.PostOut, 0, len(posts))
 	for i := range posts {
 		p := &posts[i]
-		out = append(out, model.PostOut{
-			ID:           p.ID,
-			Cat:          p.Cat,
-			Author:       p.Author,
-			Avatar:       p.Avatar,
-			Title:        p.Title,
-			Body:         p.Body,
-			Cover:        p.Cover,
-			Tags:         model.ParseTags(p.Tags),
+	out = append(out, model.PostOut{
+		ID:           p.ID,
+		Cat:          p.Cat,
+		Author:       p.Author,
+		Avatar:       p.Avatar,
+		Title:        p.Title,
+		Body:         p.Body,
+		Cover:        p.Cover,
+		Image:        p.Image,
+		Tags:         model.ParseTags(p.Tags),
 			Festival:     p.Festival,
 			Tall:         p.Tall,
 			LikeCount:    p.BaseLikes + likeCounts[p.ID],
@@ -199,7 +200,7 @@ func (s *PostService) overlayLikes(posts []model.PostOut, uid int64) []model.Pos
 }
 
 // Create 发布帖子（写主库）。
-func (s *PostService) Create(ctx context.Context, author, avatar, title, body, cat string, tags []string, festival bool) (*model.Post, error) {
+func (s *PostService) Create(ctx context.Context, author, avatar, title, body, cat string, image *string, tags []string, festival bool) (*model.Post, error) {
 	if len(tags) > 5 {
 		tags = tags[:5]
 	}
@@ -210,6 +211,7 @@ func (s *PostService) Create(ctx context.Context, author, avatar, title, body, c
 		Avatar:       avatar,
 		Title:        title,
 		Body:         body,
+		Image:        image,
 		Tags:         model.TagsToJSON(tags),
 		Festival:     festival,
 		Tall:         utf8.RuneCountInString(body) > 60,
@@ -302,6 +304,7 @@ func (s *PostService) ShapeSingle(p *model.Post, uid int64) model.PostOut {
 		Title:        p.Title,
 		Body:         p.Body,
 		Cover:        p.Cover,
+		Image:        p.Image,
 		Tags:         model.ParseTags(p.Tags),
 		Festival:     p.Festival,
 		Tall:         p.Tall,

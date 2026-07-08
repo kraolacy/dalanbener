@@ -22,6 +22,8 @@ type Config struct {
 	RedisAddr string
 	RedisPass string
 	StaticDir string
+	// UploadDir 图片上传落盘目录（经 /uploads 静态托管），默认 ./data/uploads。
+	UploadDir string
 	GinMode   string
 	CacheTTL  time.Duration
 	// RateLimit 全局限流速率（rps），0 表示关闭。
@@ -42,6 +44,7 @@ func Load() *Config {
 		RedisAddr:    getenv("REDIS_ADDR", "127.0.0.1:6379"),
 		RedisPass:    os.Getenv("REDIS_PASS"),
 		StaticDir:    os.Getenv("STATIC_DIR"),
+		UploadDir:    getenv("UPLOAD_DIR", "./data/uploads"),
 		GinMode:      getenv("GIN_MODE", "release"),
 		CacheTTL:     30 * time.Second,
 		RateLimit:    parseFloat(getenv("RATE_LIMIT", "0")),

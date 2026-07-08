@@ -36,6 +36,9 @@ services:
       - MYSQL_DSN=dalanshu:dalanshu_pass@tcp(mysql:3306)/dalanshu?charset=utf8mb4
       - REDIS_ADDR=redis:6379
       - STATIC_DIR=/app/dist
+      - UPLOAD_DIR=/app/data/uploads
+    volumes:
+      - ./data/uploads:/app/data/uploads
     depends_on:
       mysql:
         condition: service_healthy

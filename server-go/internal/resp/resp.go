@@ -17,6 +17,7 @@ var Codes = struct {
 	NotFound         int
 	Conflict         int
 	TooManyRequests  int
+	PayloadTooLarge  int
 	Internal         int
 }{
 	OK:              http.StatusOK,
@@ -25,6 +26,7 @@ var Codes = struct {
 	NotFound:        http.StatusNotFound,
 	Conflict:        http.StatusConflict,
 	TooManyRequests: http.StatusTooManyRequests,
+	PayloadTooLarge: http.StatusRequestEntityTooLarge,
 	Internal:        http.StatusInternalServerError,
 }
 
@@ -45,6 +47,13 @@ const (
 	ErrInvalidCursor = "非法游标"
 	ErrRateLimited   = "请求太频繁了，歇会儿再来"
 	ErrServerBusy    = "服务器开小差了"
+	// 社交相关
+	ErrFollowSelf        = "不能关注自己"
+	ErrMsgEmpty          = "消息不能为空"
+	ErrMsgSelf           = "不能给自己发私信"
+	ErrMsgTargetNotFound = "对方还不是注册用户，暂时无法私信"
+	ErrUploadType        = "仅支持 png/jpg/gif/webp 图片"
+	ErrUploadTooLarge    = "图片太大（请 ≤ 3MB）"
 )
 
 // Fail 写出标准化失败响应：{"error": <文案>} + 对应状态码，并中止后续处理链。

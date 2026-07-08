@@ -2,8 +2,13 @@ package handler
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"net/http/httptest"
+	"net/url"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"dalanshu/internal/db"
@@ -27,6 +32,7 @@ func setupTestRouter(t *testing.T) *gin.Engine {
 	if err := g.AutoMigrate(
 		&model.User{}, &model.Post{}, &model.Comment{},
 		&model.Like{}, &model.Collect{}, &model.Help{},
+		&model.Follow{}, &model.Message{},
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -309,6 +315,7 @@ func TestRateLimit(t *testing.T) {
 	if err := g.AutoMigrate(
 		&model.User{}, &model.Post{}, &model.Comment{},
 		&model.Like{}, &model.Collect{}, &model.Help{},
+		&model.Follow{}, &model.Message{},
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -360,5 +367,183 @@ func TestUnifiedErrorShape(t *testing.T) {
 			t.Fatalf("case#%d %s %s => code %d want %d | error %q want %q | body %s",
 				i, c.method, c.path, w.Code, c.wantCode, resp.Error, c.wantErr, w.Body.String())
 		}
+	}
+}
+
+// TestSocialFeatures 覆盖关注 toggle 与私信（会话/线程/未读/校验分支）。
+func TestSocialFeatures(t *testing.T) {
+	r := setupTestRouter(t)
+
+	regA := do(r, "POST", "/api/register", "", map[string]string{"username": "阿强", "password": "1234"})
+	var a struct {
+		Token string
+		User  model.UserOut
+	}
+	_ = json.Unmarshal(regA.Body.Bytes(), &a)
+	regB := do(r, "POST", "/api/register", "", map[string]string{"username": "小美", "password": "1234"})
+	var b struct {
+		Token string
+		User  model.UserOut
+	}
+	_ = json.Unmarshal(regB.Body.Bytes(), &b)
+	if a.Token == "" || b.Token == "" {
+		t.Fatal("注册失败")
+	}
+
+	// 关注自己 → 400
+	if w := do(r, "POST", "/api/follow/"+url.PathEscape(a.User.Name), a.Token, nil); w.Code != 400 {
+		t.Fatalf("关注自己应 400，got %d", w.Code)
+	}
+	// 关注小美 → 200，following=[小美]
+	wf := do(r, "POST", "/api/follow/"+url.PathEscape(b.User.Name), a.Token, nil)
+	if wf.Code != 200 {
+		t.Fatalf("关注应 200，got %d body %s", wf.Code, wf.Body.String())
+	}
+	var fa model.UserOut
+	_ = json.Unmarshal(wf.Body.Bytes(), &fa)
+	if len(fa.Following) != 1 || fa.Following[0] != b.User.Name {
+		t.Fatalf("following 异常: %+v", fa.Following)
+	}
+	if fa.Followers != 0 {
+		t.Fatalf("阿强粉丝应为 0，got %d", fa.Followers)
+	}
+	// 小美粉丝应为 1
+	wb := do(r, "GET", "/api/me", b.Token, nil)
+	var fb model.UserOut
+	_ = json.Unmarshal(wb.Body.Bytes(), &fb)
+	if fb.Followers != 1 {
+		t.Fatalf("小美粉丝应为 1，got %d", fb.Followers)
+	}
+	// 再次关注 = 取关
+	wf2 := do(r, "POST", "/api/follow/"+url.PathEscape(b.User.Name), a.Token, nil)
+	var fa2 model.UserOut
+	_ = json.Unmarshal(wf2.Body.Bytes(), &fa2)
+	if len(fa2.Following) != 0 {
+		t.Fatalf("再次关注应取关，following=%+v", fa2.Following)
+	}
+
+	// 私信发给未注册用户 → 404
+	if w := do(r, "POST", "/api/messages", a.Token, map[string]string{"to": "nobody", "text": "hi"}); w.Code != 404 {
+		t.Fatalf("发给未注册用户应 404，got %d", w.Code)
+	}
+	// 发给自己 → 400
+	if w := do(r, "POST", "/api/messages", a.Token, map[string]string{"to": a.User.Name, "text": "hi"}); w.Code != 400 {
+		t.Fatalf("发给自己应 400，got %d", w.Code)
+	}
+	// 空消息 → 400
+	if w := do(r, "POST", "/api/messages", a.Token, map[string]string{"to": b.User.Name, "text": "  "}); w.Code != 400 {
+		t.Fatalf("空消息应 400，got %d", w.Code)
+	}
+	// 正常发私信 → 200
+	wm := do(r, "POST", "/api/messages", a.Token, map[string]string{"to": b.User.Name, "text": "在吗"})
+	if wm.Code != 200 {
+		t.Fatalf("发私信应 200，got %d body %s", wm.Code, wm.Body.String())
+	}
+	// 小美未读 = 1
+	wb2 := do(r, "GET", "/api/me", b.Token, nil)
+	var fb2 model.UserOut
+	_ = json.Unmarshal(wb2.Body.Bytes(), &fb2)
+	if fb2.Unread != 1 {
+		t.Fatalf("小美未读应为 1，got %d", fb2.Unread)
+	}
+	// 会话列表
+	wc := do(r, "GET", "/api/messages", b.Token, nil)
+	var convos []model.ConversationOut
+	_ = json.Unmarshal(wc.Body.Bytes(), &convos)
+	if len(convos) != 1 || convos[0].Name != a.User.Name || convos[0].Unread != 1 || convos[0].Last != "在吗" {
+		t.Fatalf("会话列表异常: %+v", convos)
+	}
+	// 打开线程 → 未读归零
+	wt := do(r, "GET", "/api/messages/"+url.PathEscape(a.User.Name), b.Token, nil)
+	var th model.ThreadOut
+	_ = json.Unmarshal(wt.Body.Bytes(), &th)
+	if len(th.Messages) != 1 || th.Messages[0].Text != "在吗" || th.Messages[0].FromName != a.User.Name {
+		t.Fatalf("线程异常: %+v", th)
+	}
+	wc2 := do(r, "GET", "/api/messages", b.Token, nil)
+	var convos2 []model.ConversationOut
+	_ = json.Unmarshal(wc2.Body.Bytes(), &convos2)
+	if convos2[0].Unread != 0 {
+		t.Fatalf("打开线程后未读应归零，got %d", convos2[0].Unread)
+	}
+}
+
+// TestUpload 覆盖图片上传：合法 png 落盘返回 /uploads 路径、非图片 400。
+func TestUpload(t *testing.T) {
+	dir := t.TempDir()
+	gin.SetMode(gin.TestMode)
+	g, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sqlDB, _ := g.DB()
+	sqlDB.SetMaxOpenConns(1)
+	if err := g.AutoMigrate(
+		&model.User{}, &model.Post{}, &model.Comment{},
+		&model.Like{}, &model.Collect{}, &model.Help{},
+		&model.Follow{}, &model.Message{},
+	); err != nil {
+		t.Fatal(err)
+	}
+	set := &db.DBSet{Write: g, Read: g}
+	r := NewRouter(Deps{DB: set, Cache: nil, Secret: "secret", RateLimit: 0, UploadDir: dir})
+
+	reg := do(r, "POST", "/api/register", "", map[string]string{"username": "上传者", "password": "1234"})
+	var tok struct {
+		Token string
+	}
+	_ = json.Unmarshal(reg.Body.Bytes(), &tok)
+
+	// 合法 1x1 png
+	png := "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M8AAAMBAQDJ/pLvAAAAAElFTkSuQmCC"
+	w := do(r, "POST", "/api/upload", tok.Token, map[string]string{"dataUrl": png})
+	if w.Code != 200 {
+		t.Fatalf("upload 应 200，got %d body %s", w.Code, w.Body.String())
+	}
+	var out struct {
+		URL string `json:"url"`
+	}
+	_ = json.Unmarshal(w.Body.Bytes(), &out)
+	if !strings.HasPrefix(out.URL, "/uploads/") {
+		t.Fatalf("upload url 异常: %s", out.URL)
+	}
+	if _, err := os.Stat(filepath.Join(dir, filepath.Base(out.URL))); err != nil {
+		t.Fatalf("上传文件未落盘: %v", err)
+	}
+
+	// 非图片 → 400
+	if w := do(r, "POST", "/api/upload", tok.Token, map[string]string{"dataUrl": "data:text/plain;base64,abc"}); w.Code != 400 {
+		t.Fatalf("非图片应 400，got %d", w.Code)
+	}
+
+	// 超大图片（>3MB）→ 413
+	big := make([]byte, 3*1024*1024+1)
+	bigURL := "data:image/png;base64," + base64.StdEncoding.EncodeToString(big)
+	if w := do(r, "POST", "/api/upload", tok.Token, map[string]string{"dataUrl": bigURL}); w.Code != 413 {
+		t.Fatalf("超大图片应 413，got %d", w.Code)
+	}
+}
+
+// TestPostImageField 验证帖子 image 字段透传与返回。
+func TestPostImageField(t *testing.T) {
+	r := setupTestRouter(t)
+	reg := do(r, "POST", "/api/register", "", map[string]string{"username": "图图", "password": "1234"})
+	var tok struct {
+		Token string
+	}
+	_ = json.Unmarshal(reg.Body.Bytes(), &tok)
+
+	img := "https://example.com/p.jpg"
+	w := do(r, "POST", "/api/posts", tok.Token, map[string]any{
+		"title": "带图帖", "body": "这是一段足够长的正文用于满足长度要求，避免被长度校验拦截导致断言失败的情况发生在这里。",
+		"cat": "fishing", "image": img,
+	})
+	if w.Code != 200 {
+		t.Fatalf("createPost 应 200，got %d body %s", w.Code, w.Body.String())
+	}
+	var p model.PostOut
+	_ = json.Unmarshal(w.Body.Bytes(), &p)
+	if p.Image == nil || *p.Image != img {
+		t.Fatalf("image 未正确返回: %v", p.Image)
 	}
 }

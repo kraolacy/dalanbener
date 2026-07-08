@@ -54,7 +54,7 @@ func main() {
 		}
 	}
 
-	r := handler.NewRouter(handler.Deps{DB: set, Cache: c, Secret: cfg.JWTSecret, RateLimit: cfg.RateLimit})
+	r := handler.NewRouter(handler.Deps{DB: set, Cache: c, Secret: cfg.JWTSecret, RateLimit: cfg.RateLimit, UploadDir: cfg.UploadDir})
 
 	if cfg.StaticDir != "" {
 		if _, err := os.Stat(cfg.StaticDir); err == nil {

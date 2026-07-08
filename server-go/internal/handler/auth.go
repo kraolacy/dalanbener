@@ -58,9 +58,14 @@ func (h *Handlers) Register(c *gin.Context) {
 		resp.Fail(c, resp.Codes.Internal, resp.ErrServerBusy)
 		return
 	}
+	profile, perr := h.social.Profile(u.ID)
+	if perr != nil {
+		resp.Fail(c, resp.Codes.Internal, resp.ErrServerBusy)
+		return
+	}
 	resp.OK(c, gin.H{
 		"token": h.signToken(u),
-		"user":  model.UserOut{Name: u.Username, Avatar: u.Avatar, Bio: u.Bio},
+		"user":  profile,
 	})
 }
 
@@ -80,17 +85,22 @@ func (h *Handlers) Login(c *gin.Context) {
 		}
 		return
 	}
+	profile, perr := h.social.Profile(u.ID)
+	if perr != nil {
+		resp.Fail(c, resp.Codes.Internal, resp.ErrServerBusy)
+		return
+	}
 	resp.OK(c, gin.H{
 		"token": h.signToken(u),
-		"user":  model.UserOut{Name: u.Username, Avatar: u.Avatar, Bio: u.Bio},
+		"user":  profile,
 	})
 }
 
 func (h *Handlers) Me(c *gin.Context) {
-	u := h.user.Get(middleware.UserID(c))
-	if u == nil {
+	profile, err := h.social.Profile(middleware.UserID(c))
+	if err != nil {
 		resp.Fail(c, resp.Codes.Unauthorized, resp.ErrAccountGone)
 		return
 	}
-	resp.OK(c, model.UserOut{Name: u.Username, Avatar: u.Avatar, Bio: u.Bio})
+	resp.OK(c, profile)
 }
