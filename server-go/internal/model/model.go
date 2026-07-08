@@ -86,6 +86,7 @@ type PostOut struct {
 	Liked        bool         `json:"liked"`
 	Collected    bool         `json:"collected"`
 	Comments     []CommentOut `json:"comments"`
+	CreatedAt    int64        `json:"createdAt"`
 }
 
 type UserOut struct {
@@ -104,7 +105,7 @@ type HelpOut struct {
 	City      string `json:"city"`
 	Reward    string `json:"reward"`
 	Ts        string `json:"ts"`
-	CreatedAt int64  `json:"created_at"`
+	CreatedAt int64  `json:"createdAt"`
 }
 
 func ParseTags(s string) []string {

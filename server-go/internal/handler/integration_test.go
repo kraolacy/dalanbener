@@ -6,9 +6,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"dalanshu/internal/middleware"
+	"dalanshu/internal/db"
 	"dalanshu/internal/model"
 	"dalanshu/internal/seed"
+
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
@@ -17,37 +18,22 @@ import (
 func setupTestRouter(t *testing.T) *gin.Engine {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	g, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	sqlDB, _ := db.DB()
+	sqlDB, _ := g.DB()
 	sqlDB.SetMaxOpenConns(1)
-	if err := db.AutoMigrate(
+	if err := g.AutoMigrate(
 		&model.User{}, &model.Post{}, &model.Comment{},
 		&model.Like{}, &model.Collect{}, &model.Help{},
 	); err != nil {
 		t.Fatal(err)
 	}
-	seed.Seed(db)
+	seed.Seed(g)
 
-	h := New(db, nil, "secret")
-	r := gin.New()
-	api := r.Group("/api")
-	{
-		api.GET("/health", h.Health)
-		api.POST("/register", h.Register)
-		api.POST("/login", h.Login)
-		api.GET("/me", middleware.RequireAuth("secret"), h.Me)
-		api.GET("/posts", middleware.OptionalUser("secret"), h.Posts)
-		api.POST("/posts", middleware.RequireAuth("secret"), h.CreatePost)
-		api.POST("/posts/:id/comments", middleware.RequireAuth("secret"), h.AddComment)
-		api.POST("/posts/:id/like", middleware.RequireAuth("secret"), h.ToggleLike)
-		api.POST("/posts/:id/collect", middleware.RequireAuth("secret"), h.ToggleCollect)
-		api.GET("/helps", h.Helps)
-		api.POST("/helps", middleware.RequireAuth("secret"), h.CreateHelp)
-	}
-	return r
+	set := &db.DBSet{Write: g, Read: g}
+	return NewRouter(Deps{DB: set, Cache: nil, Secret: "secret", RateLimit: 0})
 }
 
 func do(r *gin.Engine, method, path, token string, body any) *httptest.ResponseRecorder {
@@ -80,7 +66,6 @@ func TestHealthEndpoint(t *testing.T) {
 func TestRegisterLoginFlow(t *testing.T) {
 	r := setupTestRouter(t)
 
-	// 注册
 	w := do(r, "POST", "/api/register", "", map[string]string{"username": "阿强", "password": "1234", "avatar": "🎣"})
 	if w.Code != 200 {
 		t.Fatalf("register code %d body %s", w.Code, w.Body.String())
@@ -95,13 +80,11 @@ func TestRegisterLoginFlow(t *testing.T) {
 	}
 	token := reg.Token
 
-	// /me 需鉴权
 	wMe := do(r, "GET", "/api/me", token, nil)
 	if wMe.Code != 200 {
 		t.Fatalf("me code %d", wMe.Code)
 	}
 
-	// 发帖（长正文应触发 tall=true）
 	longBody := "这是一段足够长的正文，用于验证 tall 字段是否按中文字符数正确计算，必须超过六十个字符才能触发长文标记，否则该断言会失败并暴露长度计算逻辑的问题。"
 	wPost := do(r, "POST", "/api/posts", token, map[string]any{
 		"title": "测试帖", "body": longBody, "cat": "fishing", "tags": []string{"测试", "钓鱼"},
@@ -122,7 +105,6 @@ func TestRegisterLoginFlow(t *testing.T) {
 	}
 	postID := p.ID
 
-	// 点赞 → 再点赞（toggle）→ 取消
 	wLike := do(r, "POST", "/api/posts/"+postID+"/like", token, nil)
 	if wLike.Code != 200 {
 		t.Fatalf("like code %d", wLike.Code)
@@ -139,7 +121,6 @@ func TestRegisterLoginFlow(t *testing.T) {
 		t.Fatalf("再次点赞应取消 liked=%v count=%d", p2.Liked, p2.LikeCount)
 	}
 
-	// 评论
 	wC := do(r, "POST", "/api/posts/"+postID+"/comments", token, map[string]string{"text": "好帖"})
 	if wC.Code != 200 {
 		t.Fatalf("comment code %d", wC.Code)
@@ -154,35 +135,27 @@ func TestRegisterLoginFlow(t *testing.T) {
 func TestValidationBranches(t *testing.T) {
 	r := setupTestRouter(t)
 
-	// 用户名过短 → 400
 	if w := do(r, "POST", "/api/register", "", map[string]string{"username": "a", "password": "1234"}); w.Code != 400 {
 		t.Fatalf("短用户名应 400，got %d", w.Code)
 	}
-	// 密码过短 → 400
 	if w := do(r, "POST", "/api/register", "", map[string]string{"username": "阿强强", "password": "12"}); w.Code != 400 {
 		t.Fatalf("短密码应 400，got %d", w.Code)
 	}
-	// 正常注册
 	if w := do(r, "POST", "/api/register", "", map[string]string{"username": "用户甲", "password": "1234"}); w.Code != 200 {
 		t.Fatalf("注册应 200，got %d", w.Code)
 	}
-	// 重名 → 409
 	if w := do(r, "POST", "/api/register", "", map[string]string{"username": "用户甲", "password": "1234"}); w.Code != 409 {
 		t.Fatalf("重名应 409，got %d", w.Code)
 	}
-	// 登录错误密码 → 401
 	if w := do(r, "POST", "/api/login", "", map[string]string{"username": "用户甲", "password": "wrong"}); w.Code != 401 {
 		t.Fatalf("错误密码应 401，got %d", w.Code)
 	}
-	// 未登录发帖 → 401（缺少 token，中间件拦截）
 	if w := do(r, "POST", "/api/posts", "", map[string]string{"title": "x", "body": "y"}); w.Code != 401 {
 		t.Fatalf("未登录发帖应 401，got %d", w.Code)
 	}
-	// /me 无 token → 401
 	if w := do(r, "GET", "/api/me", "", nil); w.Code != 401 {
 		t.Fatalf("/me 无 token 应 401，got %d", w.Code)
 	}
-	// 点赞不存在的帖子 → 404
 	if w := do(r, "POST", "/api/posts/nope/like", "faketoken", nil); w.Code != 401 {
 		t.Fatalf("伪造 token 应 401，got %d", w.Code)
 	}
@@ -190,7 +163,6 @@ func TestValidationBranches(t *testing.T) {
 
 func TestHelpsFlow(t *testing.T) {
 	r := setupTestRouter(t)
-	// 种子互助 5 条
 	w := do(r, "GET", "/api/helps", "", nil)
 	if w.Code != 200 {
 		t.Fatalf("helps code %d", w.Code)
@@ -201,7 +173,6 @@ func TestHelpsFlow(t *testing.T) {
 		t.Fatalf("helps 数 %d want 5", len(list))
 	}
 
-	// 登录后发互助
 	reg := do(r, "POST", "/api/register", "", map[string]string{"username": "热心市民", "password": "1234"})
 	var regResp struct{ Token string }
 	_ = json.Unmarshal(reg.Body.Bytes(), &regResp)
@@ -215,7 +186,6 @@ func TestHelpsFlow(t *testing.T) {
 		t.Fatalf("互助字段异常: %+v", h)
 	}
 
-	// offer 类型下，空 body → 400
 	if w := do(r, "POST", "/api/helps", regResp.Token, map[string]string{"type": "offer", "title": "x", "body": ""}); w.Code != 400 {
 		t.Fatalf("空 body 应 400，got %d", w.Code)
 	}

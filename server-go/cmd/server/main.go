@@ -14,7 +14,6 @@ import (
 	"dalanshu/internal/config"
 	"dalanshu/internal/db"
 	"dalanshu/internal/handler"
-	"dalanshu/internal/middleware"
 	"dalanshu/internal/seed"
 
 	"github.com/gin-gonic/gin"
@@ -23,27 +22,27 @@ import (
 func main() {
 	cfg := config.Load()
 
-	// 子命令：数据迁移（SQLite -> MySQL 平滑升级）
+	// 子命令：数据迁移（SQLite <-> MySQL 平滑升级）。
 	if len(os.Args) > 1 && os.Args[1] == "migrate" {
-		runMigrate(cfg)
+		db.RunMigrate(cfg)
 		return
 	}
 
 	gin.SetMode(cfg.GinMode)
 
-	// 数据库驱动可插拔：sqlite（默认，零配置）或 mysql（生产 / 高并发）
+	// 数据库驱动可插拔：sqlite（默认，零配置）或 mysql（生产 / 高并发）。
 	dsn, err := resolveDSN(cfg)
 	if err != nil {
 		log.Fatalf("数据库配置错误: %v", err)
 	}
-	database, err := db.Connect(cfg.DBDriver, dsn)
+	set, err := db.Connect(cfg.DBDriver, dsn, cfg.MySQLReadDSN)
 	if err != nil {
 		log.Fatalf("连接数据库(%s)失败: %v", cfg.DBDriver, err)
 	}
-	if err := db.Migrate(database); err != nil {
+	if err := db.Migrate(set); err != nil {
 		log.Fatalf("数据库迁移失败: %v", err)
 	}
-	seed.Seed(database)
+	seed.Seed(set.W())
 
 	// Redis 可选：未配置或不可达时自动降级为直查数据库。
 	var c *cache.Cache
@@ -55,23 +54,7 @@ func main() {
 		}
 	}
 
-	h := handler.New(database, c, cfg.JWTSecret)
-	r := gin.New()
-	r.Use(gin.Recovery())
-	api := r.Group("/api")
-	{
-		api.GET("/health", h.Health)
-		api.POST("/register", h.Register)
-		api.POST("/login", h.Login)
-		api.GET("/me", middleware.RequireAuth(cfg.JWTSecret), h.Me)
-		api.GET("/posts", middleware.OptionalUser(cfg.JWTSecret), h.Posts)
-		api.POST("/posts", middleware.RequireAuth(cfg.JWTSecret), h.CreatePost)
-		api.POST("/posts/:id/comments", middleware.RequireAuth(cfg.JWTSecret), h.AddComment)
-		api.POST("/posts/:id/like", middleware.RequireAuth(cfg.JWTSecret), h.ToggleLike)
-		api.POST("/posts/:id/collect", middleware.RequireAuth(cfg.JWTSecret), h.ToggleCollect)
-		api.GET("/helps", h.Helps)
-		api.POST("/helps", middleware.RequireAuth(cfg.JWTSecret), h.CreateHelp)
-	}
+	r := handler.NewRouter(handler.Deps{DB: set, Cache: c, Secret: cfg.JWTSecret, RateLimit: cfg.RateLimit})
 
 	if cfg.StaticDir != "" {
 		if _, err := os.Stat(cfg.StaticDir); err == nil {
@@ -116,54 +99,6 @@ func resolveDSN(cfg *config.Config) (string, error) {
 	if cfg.DBDriver == "mysql" {
 		if cfg.MySQLDSN == "" {
 			return "", errors.New("DB_DRIVER=mysql 时 MYSQL_DSN 不能为空")
-		}
-		return cfg.MySQLDSN, nil
-	}
-	return cfg.SQLitePath, nil
-}
-
-// runMigrate 执行 SQLite -> MySQL（或反之）的平滑数据迁移。
-func runMigrate(cfg *config.Config) {
-	from := cfg.MigrateFrom
-	if from == "" {
-		from = "sqlite"
-	}
-	to := cfg.MigrateTo
-	if to == "" {
-		to = "mysql"
-	}
-	if from == to {
-		log.Fatal("迁移源与目标驱动不能相同")
-	}
-	srcDSN, err := dsnForDriver(cfg, from)
-	if err != nil {
-		log.Fatalf("源 DSN 解析失败: %v", err)
-	}
-	dstDSN, err := dsnForDriver(cfg, to)
-	if err != nil {
-		log.Fatalf("目标 DSN 解析失败: %v", err)
-	}
-	src, err := db.Connect(from, srcDSN)
-	if err != nil {
-		log.Fatalf("连接源库(%s)失败: %v", from, err)
-	}
-	dst, err := db.Connect(to, dstDSN)
-	if err != nil {
-		log.Fatalf("连接目标库(%s)失败: %v", to, err)
-	}
-	if err := db.Migrate(dst); err != nil {
-		log.Fatalf("目标库迁移失败: %v", err)
-	}
-	if err := db.MigrateData(src, dst); err != nil {
-		log.Fatalf("数据迁移失败: %v", err)
-	}
-	log.Printf("[migrate] 完成：%s(%s) -> %s(%s)", from, srcDSN, to, dstDSN)
-}
-
-func dsnForDriver(cfg *config.Config, driver string) (string, error) {
-	if driver == "mysql" {
-		if cfg.MySQLDSN == "" {
-			return "", errors.New("MYSQL_DSN 不能为空")
 		}
 		return cfg.MySQLDSN, nil
 	}

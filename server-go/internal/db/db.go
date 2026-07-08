@@ -16,10 +16,48 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-// Connect 按驱动名建立连接并调优连接池。
-//   - driver="sqlite"（默认）：零配置本地运行，复用既有 SQLite 能力。
-//   - driver="mysql"：生产 / 高并发，启用较大连接池。
-func Connect(driver, dsn string) (*gorm.DB, error) {
+// DBSet 封装读写数据源，支持读写分离：
+//   - Write：主库，承载所有写操作与迁移。
+//   - Read：从库（可选）；为空时回落到 Write，保证无副本环境仍可运行。
+type DBSet struct {
+	Write *gorm.DB
+	Read  *gorm.DB
+}
+
+// R 读数据源：优先从库，未配置则主库。
+func (s *DBSet) R() *gorm.DB {
+	if s.Read != nil {
+		return s.Read
+	}
+	return s.Write
+}
+
+// W 写数据源。
+func (s *DBSet) W() *gorm.DB { return s.Write }
+
+// Connect 按驱动建立连接集（可插拔 + 读写分离）。
+//   - driver="sqlite"（默认）：零配置本地运行，复用既有 SQLite 能力，忽略 readDSN。
+//   - driver="mysql"：生产 / 高并发；readDSN 非空时建立读副本连接。
+func Connect(driver, dsn, readDSN string) (*DBSet, error) {
+	write, err := open(driver, dsn)
+	if err != nil {
+		return nil, err
+	}
+	set := &DBSet{Write: write}
+	if readDSN != "" && driver == "mysql" {
+		read, err := open(driver, readDSN)
+		if err != nil {
+			return nil, fmt.Errorf("连接读副本失败: %w", err)
+		}
+		set.Read = read
+		log.Printf("[db] 读写分离已启用：读请求走从库")
+	} else {
+		set.Read = write
+	}
+	return set, nil
+}
+
+func open(driver, dsn string) (*gorm.DB, error) {
 	var dialector gorm.Dialector
 	switch driver {
 	case "mysql":
@@ -67,9 +105,9 @@ func sqliteDSN(path string) string {
 		"&_pragma=foreign_keys(0)"
 }
 
-// Migrate 自动建表（幂等）。
-func Migrate(database *gorm.DB) error {
-	return database.AutoMigrate(
+// Migrate 自动建表（幂等），作用在写库。
+func Migrate(d *DBSet) error {
+	return d.W().AutoMigrate(
 		&model.User{},
 		&model.Post{},
 		&model.Comment{},
@@ -80,14 +118,13 @@ func Migrate(database *gorm.DB) error {
 }
 
 // MigrateData 将 src 的全量数据平滑拷贝到 dst（同构 GORM 模型，可重复执行，目标已非空则跳过）。
-// 用于「SQLite 本地库 -> MySQL 生产库」的零停机升级：先在 MySQL 侧 Migrate 建表，再拷贝存量数据。
-func MigrateData(src, dst *gorm.DB) error {
+func MigrateData(src, dst *DBSet) error {
 	models := []any{
 		&model.User{}, &model.Post{}, &model.Comment{},
 		&model.Like{}, &model.Collect{}, &model.Help{},
 	}
 	for _, m := range models {
-		if err := copyTable(src, dst, m); err != nil {
+		if err := copyTable(src.W(), dst.W(), m); err != nil {
 			return err
 		}
 	}
@@ -95,7 +132,6 @@ func MigrateData(src, dst *gorm.DB) error {
 }
 
 func copyTable(src, dst *gorm.DB, m any) error {
-	// 目标已存在数据则跳过（幂等，避免重复迁移）。
 	var n int64
 	if err := dst.Model(m).Count(&n).Error; err != nil {
 		return fmt.Errorf("统计目标表失败 %T: %w", m, err)
@@ -112,7 +148,6 @@ func copyTable(src, dst *gorm.DB, m any) error {
 	if len(rows) == 0 {
 		return nil
 	}
-	// 分批写入，避免大表一次性 INSERT 占用过多内存。
 	if err := dst.Model(m).
 		Clauses(clause.OnConflict{DoNothing: true}).
 		CreateInBatches(&rows, 200).Error; err != nil {
