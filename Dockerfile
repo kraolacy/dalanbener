@@ -1,4 +1,4 @@
-# ---- 1) 构建前端静态页（单文件 dist/index.html）----
+# ---- 1) 构建前端单文件（vite-plugin-singlefile 产物为 dist/index.html）----
 FROM node:24-slim AS web
 WORKDIR /web
 COPY package.json package-lock.json ./
@@ -6,13 +6,23 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-# ---- 2) 运行：Node 同时提供 API 和前端（用内置 node:sqlite，无原生编译）----
-FROM node:24-slim
+# ---- 2) 构建 Go 后端（gin + gorm + mysql + redis）----
+# 注意：依赖树要求 Go >= 1.25（部分 golang.org/x 与 modernc.org 传递依赖所致），故构建镜像用 1.25。
+FROM golang:1.25 AS gobuild
+WORKDIR /src
+COPY server-go/ ./
+RUN go mod download
+RUN CGO_ENABLED=0 GOOS=linux go build -o /dalanshu ./cmd/server
+
+# ---- 3) 运行 ----
+FROM alpine:3.20
+RUN apk add --no-cache ca-certificates
 WORKDIR /app
-ENV NODE_ENV=production PORT=3000 DB_PATH=/app/data/dalanshu.db
-COPY server/package.json ./
-RUN npm install --omit=dev
-COPY server/ ./
-COPY --from=web /web/dist ./public
-EXPOSE 3000
-CMD ["node", "server.js"]
+COPY --from=web /web/dist ./dist
+COPY --from=gobuild /dalanshu /app/dalanshu
+ENV PORT=8080 \
+    STATIC_DIR=/app/dist \
+    GIN_MODE=release \
+    DB_DRIVER=mysql
+EXPOSE 8080
+CMD ["/app/dalanshu"]
