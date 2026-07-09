@@ -13,7 +13,7 @@ const LS = {
 const K = {
   userPosts: 'dls_userPosts', likes: 'dls_likes', collects: 'dls_collects',
   comments: 'dls_comments', userHelp: 'dls_userHelp', accounts: 'dls_accounts',
-  currentUser: 'dls_currentUser', token: 'dls_token', following: 'dls_following',
+  currentUser: 'dls_currentUser', token: 'dls_token', following: 'dls_following', theme: 'dls_theme',
 }
 const GUEST = { name: '游客', avatar: '🙂', bio: '登录后开启你的散帅之旅', guest: true, following: [], followers: 0, unread: 0 }
 
@@ -38,6 +38,7 @@ export function StoreProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(() => LS.get(K.currentUser, null))
   const [lFollowing, setLFollowing] = useState(() => LS.get(K.following, {}))
   const [authOpen, setAuthOpen] = useState(false)
+  const [theme, setThemeState] = useState(() => LS.get(K.theme, 'fresh')) // 'fresh' | 'cyber'
 
   // localStorage 持久化
   useEffect(() => LS.set(K.userPosts, userPosts), [userPosts])
@@ -48,6 +49,7 @@ export function StoreProvider({ children }) {
   useEffect(() => LS.set(K.accounts, accounts), [accounts])
   useEffect(() => LS.set(K.currentUser, currentUser), [currentUser])
   useEffect(() => LS.set(K.following, lFollowing), [lFollowing])
+  useEffect(() => { document.documentElement.setAttribute('data-theme', theme); LS.set(K.theme, theme) }, [theme])
 
   // —— 启动：探测后端 ——
   useEffect(() => {
@@ -227,7 +229,7 @@ export function StoreProvider({ children }) {
     },
   }
 
-  const value = { posts, helps, likes, collects, me, isLoggedIn, authOpen, ready, backend, ...actions }
+  const value = { posts, helps, likes, collects, me, isLoggedIn, authOpen, ready, backend, theme, setTheme: setThemeState, ...actions }
   return <StoreCtx.Provider value={value}>{children}</StoreCtx.Provider>
 }
 

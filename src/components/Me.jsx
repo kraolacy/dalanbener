@@ -2,20 +2,48 @@ import { useState } from 'react'
 import { useStore } from '../store.jsx'
 import Feed from './Feed.jsx'
 
+const THEMES = [
+  { key: 'fresh', name: '清爽', desc: '干净明亮 · 日常浏览', sw: ['#ffffff', '#2f6bff', '#f59e0b'] },
+  { key: 'cyber', name: '赛博朋克', desc: '暗黑霓虹 · 2077 风', sw: ['#06070d', '#00e5ff', '#fcee0a'] },
+]
+
+function ThemeSwitch() {
+  const { theme, setTheme } = useStore()
+  return (
+    <div className="theme-switch">
+      <div className="st-label">🎨 界面主题</div>
+      <div className="theme-opts">
+        {THEMES.map((o) => (
+          <button key={o.key} className={`theme-opt ${theme === o.key ? 'sel' : ''}`} onClick={() => setTheme(o.key)}>
+            <div className="sw">{o.sw.map((c, i) => (
+              <i key={i} style={{ background: c, boxShadow: c === '#ffffff' ? 'inset 0 0 0 1px #e5e7eb' : 'none' }} />
+            ))}</div>
+            <b>{o.name}{theme === o.key ? ' ✓' : ''}</b>
+            <small>{o.desc}</small>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function Me({ onOpen }) {
   const { posts, me, likes, collects, openAuth, logout } = useStore()
   const [tab, setTab] = useState('mine')
 
-  // 未登录：显示登录引导
+  // 未登录：显示登录引导（仍可切主题）
   if (me.guest) {
     return (
-      <div className="empty" style={{ paddingTop: 80 }}>
-        <div className="big">🙂</div>
-        <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>还没登录</p>
-        <p style={{ margin: '8px 0 20px' }}>登录后才能发帖、点赞、评论、找搭子</p>
-        <button className="submit-btn" style={{ maxWidth: 220, margin: '0 auto' }} onClick={openAuth}>
-          登录 / 注册
-        </button>
+      <div>
+        <div className="empty" style={{ paddingTop: 60 }}>
+          <div className="big">🙂</div>
+          <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>还没登录</p>
+          <p style={{ margin: '8px 0 20px' }}>登录后才能发帖、点赞、评论、找搭子</p>
+          <button className="submit-btn" style={{ maxWidth: 220, margin: '0 auto' }} onClick={openAuth}>
+            登录 / 注册
+          </button>
+        </div>
+        <ThemeSwitch />
       </div>
     )
   }
@@ -50,6 +78,8 @@ export default function Me({ onOpen }) {
         <span className="badge">💙 大蓝本儿 · 蓝V</span>
         <span className="badge">🤝 热心搭子</span>
       </div>
+
+      <ThemeSwitch />
 
       <div className="page" style={{ paddingTop: 4, paddingBottom: 0 }}>
         <div className="tabs" style={{ position: 'static', padding: '6px 0' }}>

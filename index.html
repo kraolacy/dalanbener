@@ -7,6 +7,10 @@
     <meta name="theme-color" content="#1466ff" />
     <meta name="description" content="大蓝本儿 Sunshine-note —— 男性社群兴趣、生活、互助分享社区。8·3 国际散帅节快乐！" />
     <title>大蓝本儿 · Sunshine-note</title>
+    <script>
+      // 渲染前先套用已保存的主题，避免闪烁
+      try { var t = JSON.parse(localStorage.getItem('dls_theme')); if (t) document.documentElement.setAttribute('data-theme', t); } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>
